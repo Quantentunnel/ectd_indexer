@@ -48,6 +48,12 @@ namespace eCTD_indexer
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainWindow));
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+            this.fileExplorerUserControl = new eCTD_indexer.FileExplorerUserControl();
+            this.lFile = new System.Windows.Forms.Label();
+            this.label11 = new System.Windows.Forms.Label();
+            this.lStatus = new System.Windows.Forms.Label();
+            this.label9 = new System.Windows.Forms.Label();
             this.toolStrip = new System.Windows.Forms.ToolStrip();
             this.tsbCreate = new System.Windows.Forms.ToolStripButton();
             this.tsbOpenDossier = new System.Windows.Forms.ToolStripButton();
@@ -63,7 +69,7 @@ namespace eCTD_indexer
             this.tsbOptions = new System.Windows.Forms.ToolStripButton();
             this.tsbCloseApp = new System.Windows.Forms.ToolStripButton();
             this.tsbAbout = new System.Windows.Forms.ToolStripButton();
-            this.menuStrip1 = new System.Windows.Forms.MenuStrip();
+            this.menuStrip = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newDossierToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openDossierToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -71,8 +77,9 @@ namespace eCTD_indexer
             this.tsbiCloseDossier = new System.Windows.Forms.ToolStripMenuItem();
             this.closeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.editToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.refreshToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.addReplaceMetaDatabaseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tsbideleteAllEmptyDirectoriesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.refreshToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.tsmiProperties = new System.Windows.Forms.ToolStripMenuItem();
             this.checkToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -223,13 +230,16 @@ namespace eCTD_indexer
             this.textBoxLVApp = new System.Windows.Forms.TextBox();
             this.textBoxITApp = new System.Windows.Forms.TextBox();
             this.checkBoxHU = new System.Windows.Forms.CheckBox();
-            this.fileExplorerUserControl = new eCTD_indexer.FileExplorerUserControl();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
+            this.splitContainer2.Panel1.SuspendLayout();
+            this.splitContainer2.Panel2.SuspendLayout();
+            this.splitContainer2.SuspendLayout();
             this.toolStrip.SuspendLayout();
-            this.menuStrip1.SuspendLayout();
+            this.menuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbSubmissionUnitCopy)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbSubDescCopy)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbRelSeqCopy)).BeginInit();
@@ -252,9 +262,9 @@ namespace eCTD_indexer
             // 
             // splitContainer1.Panel1
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.fileExplorerUserControl);
+            this.splitContainer1.Panel1.Controls.Add(this.splitContainer2);
             this.splitContainer1.Panel1.Controls.Add(this.toolStrip);
-            this.splitContainer1.Panel1.Controls.Add(this.menuStrip1);
+            this.splitContainer1.Panel1.Controls.Add(this.menuStrip);
             // 
             // splitContainer1.Panel2
             // 
@@ -400,6 +410,74 @@ namespace eCTD_indexer
             this.splitContainer1.Size = new System.Drawing.Size(962, 614);
             this.splitContainer1.SplitterDistance = 181;
             this.splitContainer1.TabIndex = 122;
+            // 
+            // splitContainer2
+            // 
+            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer2.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            this.splitContainer2.IsSplitterFixed = true;
+            this.splitContainer2.Location = new System.Drawing.Point(0, 63);
+            this.splitContainer2.Name = "splitContainer2";
+            this.splitContainer2.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            // 
+            // splitContainer2.Panel1
+            // 
+            this.splitContainer2.Panel1.Controls.Add(this.fileExplorerUserControl);
+            // 
+            // splitContainer2.Panel2
+            // 
+            this.splitContainer2.Panel2.Controls.Add(this.lFile);
+            this.splitContainer2.Panel2.Controls.Add(this.label11);
+            this.splitContainer2.Panel2.Controls.Add(this.lStatus);
+            this.splitContainer2.Panel2.Controls.Add(this.label9);
+            this.splitContainer2.Size = new System.Drawing.Size(181, 551);
+            this.splitContainer2.SplitterDistance = 510;
+            this.splitContainer2.TabIndex = 125;
+            // 
+            // fileExplorerUserControl
+            // 
+            this.fileExplorerUserControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.fileExplorerUserControl.Location = new System.Drawing.Point(0, 0);
+            this.fileExplorerUserControl.Margin = new System.Windows.Forms.Padding(2);
+            this.fileExplorerUserControl.Name = "fileExplorerUserControl";
+            this.fileExplorerUserControl.Size = new System.Drawing.Size(181, 510);
+            this.fileExplorerUserControl.TabIndex = 123;
+            // 
+            // lFile
+            // 
+            this.lFile.AutoSize = true;
+            this.lFile.Location = new System.Drawing.Point(47, 5);
+            this.lFile.Name = "lFile";
+            this.lFile.Size = new System.Drawing.Size(41, 13);
+            this.lFile.TabIndex = 3;
+            this.lFile.Text = "label14";
+            // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.Location = new System.Drawing.Point(4, 5);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(26, 13);
+            this.label11.TabIndex = 2;
+            this.label11.Text = "File:";
+            // 
+            // lStatus
+            // 
+            this.lStatus.AutoSize = true;
+            this.lStatus.Location = new System.Drawing.Point(47, 20);
+            this.lStatus.Name = "lStatus";
+            this.lStatus.Size = new System.Drawing.Size(41, 13);
+            this.lStatus.TabIndex = 1;
+            this.lStatus.Text = "label11";
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Location = new System.Drawing.Point(4, 20);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(43, 13);
+            this.label9.TabIndex = 0;
+            this.label9.Text = "Status: ";
             // 
             // toolStrip
             // 
@@ -567,21 +645,22 @@ namespace eCTD_indexer
             this.tsbAbout.Text = "About eCTD indexer";
             this.tsbAbout.Click += new System.EventHandler(this.tsbAbout_Click);
             // 
-            // menuStrip1
+            // menuStrip
             // 
-            this.menuStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
-            this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuStrip.ImageScalingSize = new System.Drawing.Size(32, 32);
+            this.menuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem,
             this.editToolStripMenuItem,
             this.checkToolStripMenuItem,
             this.createToolStripMenuItem,
             this.helpToolStripMenuItem});
-            this.menuStrip1.Location = new System.Drawing.Point(0, 0);
-            this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Padding = new System.Windows.Forms.Padding(3, 1, 0, 1);
-            this.menuStrip1.Size = new System.Drawing.Size(181, 24);
-            this.menuStrip1.TabIndex = 124;
-            this.menuStrip1.Text = "menuStrip1";
+            this.menuStrip.Location = new System.Drawing.Point(0, 0);
+            this.menuStrip.Name = "menuStrip";
+            this.menuStrip.Padding = new System.Windows.Forms.Padding(3, 1, 0, 1);
+            this.menuStrip.Size = new System.Drawing.Size(181, 24);
+            this.menuStrip.TabIndex = 124;
+            this.menuStrip.Text = "menuStrip1";
+            this.menuStrip.MenuActivate += new System.EventHandler(this.menuStrip_MenuActivate);
             // 
             // fileToolStripMenuItem
             // 
@@ -633,37 +712,45 @@ namespace eCTD_indexer
             // editToolStripMenuItem
             // 
             this.editToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.refreshToolStripMenuItem,
+            this.addReplaceMetaDatabaseToolStripMenuItem,
             this.tsbideleteAllEmptyDirectoriesToolStripMenuItem,
+            this.refreshToolStripMenuItem,
             this.toolStripSeparator2,
             this.tsmiProperties});
             this.editToolStripMenuItem.Name = "editToolStripMenuItem";
             this.editToolStripMenuItem.Size = new System.Drawing.Size(39, 22);
             this.editToolStripMenuItem.Text = "Edit";
             // 
-            // refreshToolStripMenuItem
+            // addReplaceMetaDatabaseToolStripMenuItem
             // 
-            this.refreshToolStripMenuItem.Name = "refreshToolStripMenuItem";
-            this.refreshToolStripMenuItem.Size = new System.Drawing.Size(217, 22);
-            this.refreshToolStripMenuItem.Text = "Refresh";
-            this.refreshToolStripMenuItem.Click += new System.EventHandler(this.refreshToolStripMenuItem_Click);
+            this.addReplaceMetaDatabaseToolStripMenuItem.Name = "addReplaceMetaDatabaseToolStripMenuItem";
+            this.addReplaceMetaDatabaseToolStripMenuItem.Size = new System.Drawing.Size(218, 22);
+            this.addReplaceMetaDatabaseToolStripMenuItem.Text = "Add / Reset Meta-Database";
+            this.addReplaceMetaDatabaseToolStripMenuItem.Click += new System.EventHandler(this.addReplaceMetaDatabaseToolStripMenuItem_Click);
             // 
             // tsbideleteAllEmptyDirectoriesToolStripMenuItem
             // 
             this.tsbideleteAllEmptyDirectoriesToolStripMenuItem.Name = "tsbideleteAllEmptyDirectoriesToolStripMenuItem";
-            this.tsbideleteAllEmptyDirectoriesToolStripMenuItem.Size = new System.Drawing.Size(217, 22);
+            this.tsbideleteAllEmptyDirectoriesToolStripMenuItem.Size = new System.Drawing.Size(218, 22);
             this.tsbideleteAllEmptyDirectoriesToolStripMenuItem.Text = "Delete all empty directories";
             this.tsbideleteAllEmptyDirectoriesToolStripMenuItem.Click += new System.EventHandler(this.tsbideleteAllEmptyDirectoriesToolStripMenuItem_Click);
+            // 
+            // refreshToolStripMenuItem
+            // 
+            this.refreshToolStripMenuItem.Name = "refreshToolStripMenuItem";
+            this.refreshToolStripMenuItem.Size = new System.Drawing.Size(218, 22);
+            this.refreshToolStripMenuItem.Text = "Refresh";
+            this.refreshToolStripMenuItem.Click += new System.EventHandler(this.refreshToolStripMenuItem_Click);
             // 
             // toolStripSeparator2
             // 
             this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(214, 6);
+            this.toolStripSeparator2.Size = new System.Drawing.Size(215, 6);
             // 
             // tsmiProperties
             // 
             this.tsmiProperties.Name = "tsmiProperties";
-            this.tsmiProperties.Size = new System.Drawing.Size(217, 22);
+            this.tsmiProperties.Size = new System.Drawing.Size(218, 22);
             this.tsmiProperties.Text = "Properties";
             this.tsmiProperties.Click += new System.EventHandler(this.tsmiProperties_Click);
             // 
@@ -2169,15 +2256,6 @@ namespace eCTD_indexer
             this.checkBoxHU.UseVisualStyleBackColor = true;
             this.checkBoxHU.CheckedChanged += new System.EventHandler(this.checkBoxHU_CheckedChanged);
             // 
-            // fileExplorerUserControl
-            // 
-            this.fileExplorerUserControl.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.fileExplorerUserControl.Location = new System.Drawing.Point(0, 63);
-            this.fileExplorerUserControl.Margin = new System.Windows.Forms.Padding(2);
-            this.fileExplorerUserControl.Name = "fileExplorerUserControl";
-            this.fileExplorerUserControl.Size = new System.Drawing.Size(181, 551);
-            this.fileExplorerUserControl.TabIndex = 123;
-            // 
             // MainWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -2185,7 +2263,7 @@ namespace eCTD_indexer
             this.ClientSize = new System.Drawing.Size(962, 614);
             this.Controls.Add(this.splitContainer1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.MainMenuStrip = this.menuStrip1;
+            this.MainMenuStrip = this.menuStrip;
             this.Name = "MainWindow";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Tag = "6";
@@ -2198,10 +2276,15 @@ namespace eCTD_indexer
             this.splitContainer1.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
+            this.splitContainer2.Panel1.ResumeLayout(false);
+            this.splitContainer2.Panel2.ResumeLayout(false);
+            this.splitContainer2.Panel2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
+            this.splitContainer2.ResumeLayout(false);
             this.toolStrip.ResumeLayout(false);
             this.toolStrip.PerformLayout();
-            this.menuStrip1.ResumeLayout(false);
-            this.menuStrip1.PerformLayout();
+            this.menuStrip.ResumeLayout(false);
+            this.menuStrip.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbSubmissionUnitCopy)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbSubDescCopy)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pbRelSeqCopy)).EndInit();
@@ -2374,7 +2457,7 @@ namespace eCTD_indexer
         private System.Windows.Forms.PictureBox pbSubDescCopy;
         private System.Windows.Forms.PictureBox pbRelSeqCopy;
         private System.Windows.Forms.ToolStripButton tsbOpenLastDossier;
-        private System.Windows.Forms.MenuStrip menuStrip1;
+        private System.Windows.Forms.MenuStrip menuStrip;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem newDossierToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem openDossierToolStripMenuItem;
@@ -2395,6 +2478,12 @@ namespace eCTD_indexer
         private System.Windows.Forms.ToolStripMenuItem zipDossierToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripMenuItem tsmiProperties;
+        private System.Windows.Forms.SplitContainer splitContainer2;
+        private System.Windows.Forms.Label lStatus;
+        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.Label lFile;
+        private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.ToolStripMenuItem addReplaceMetaDatabaseToolStripMenuItem;
     }
 }
 

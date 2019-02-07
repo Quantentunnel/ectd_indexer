@@ -46,6 +46,12 @@ namespace eCTD_indexer
             this.cmflOpen = new System.Windows.Forms.ToolStripMenuItem();
             this.cmflDelete = new System.Windows.Forms.ToolStripMenuItem();
             this.cmflInfo = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.markAsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.MarkAsNew = new System.Windows.Forms.ToolStripMenuItem();
+            this.MarkAsAppend = new System.Windows.Forms.ToolStripMenuItem();
+            this.MarkAsReplace = new System.Windows.Forms.ToolStripMenuItem();
+            this.MarkAsDelete = new System.Windows.Forms.ToolStripMenuItem();
             this.contextMenuFolderView = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.tsmiCreateFolder = new System.Windows.Forms.ToolStripMenuItem();
             this.tsmiOpen = new System.Windows.Forms.ToolStripMenuItem();
@@ -118,6 +124,7 @@ namespace eCTD_indexer
             this.FileListView.UseCompatibleStateImageBehavior = false;
             this.FileListView.View = System.Windows.Forms.View.Details;
             this.FileListView.ItemDrag += new System.Windows.Forms.ItemDragEventHandler(this.FileListView_ItemDrag);
+            this.FileListView.ItemSelectionChanged += new System.Windows.Forms.ListViewItemSelectionChangedEventHandler(this.FileListView_ItemSelectionChanged);
             this.FileListView.DragDrop += new System.Windows.Forms.DragEventHandler(this.FileListView_DragDrop);
             this.FileListView.DragEnter += new System.Windows.Forms.DragEventHandler(this.FileListView_DragEnter);
             this.FileListView.DoubleClick += new System.EventHandler(this.FileListView_DoubleClick);
@@ -144,30 +151,77 @@ namespace eCTD_indexer
             this.contextMenuFileListView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.cmflOpen,
             this.cmflDelete,
-            this.cmflInfo});
+            this.cmflInfo,
+            this.toolStripSeparator1,
+            this.markAsToolStripMenuItem});
             this.contextMenuFileListView.Name = "contextMenuStrip";
-            this.contextMenuFileListView.Size = new System.Drawing.Size(117, 70);
+            this.contextMenuFileListView.Size = new System.Drawing.Size(181, 120);
+            this.contextMenuFileListView.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuFileListView_Opening);
             // 
             // cmflOpen
             // 
             this.cmflOpen.Name = "cmflOpen";
-            this.cmflOpen.Size = new System.Drawing.Size(116, 22);
+            this.cmflOpen.Size = new System.Drawing.Size(180, 22);
             this.cmflOpen.Text = "Open...";
             this.cmflOpen.Click += new System.EventHandler(this.cmflOpen_Click);
             // 
             // cmflDelete
             // 
             this.cmflDelete.Name = "cmflDelete";
-            this.cmflDelete.Size = new System.Drawing.Size(116, 22);
+            this.cmflDelete.Size = new System.Drawing.Size(180, 22);
             this.cmflDelete.Text = "Delete...";
             this.cmflDelete.Click += new System.EventHandler(this.cmflDelete_Click);
             // 
             // cmflInfo
             // 
             this.cmflInfo.Name = "cmflInfo";
-            this.cmflInfo.Size = new System.Drawing.Size(116, 22);
+            this.cmflInfo.Size = new System.Drawing.Size(180, 22);
             this.cmflInfo.Text = "Info...";
             this.cmflInfo.Click += new System.EventHandler(this.cmflInfo_Click);
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
+            // 
+            // markAsToolStripMenuItem
+            // 
+            this.markAsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.MarkAsNew,
+            this.MarkAsAppend,
+            this.MarkAsReplace,
+            this.MarkAsDelete});
+            this.markAsToolStripMenuItem.Name = "markAsToolStripMenuItem";
+            this.markAsToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.markAsToolStripMenuItem.Text = "Mark as...";
+            // 
+            // MarkAsNew
+            // 
+            this.MarkAsNew.Name = "MarkAsNew";
+            this.MarkAsNew.Size = new System.Drawing.Size(116, 22);
+            this.MarkAsNew.Text = "New";
+            this.MarkAsNew.Click += new System.EventHandler(this.MarkAsNew_Click);
+            // 
+            // MarkAsAppend
+            // 
+            this.MarkAsAppend.Name = "MarkAsAppend";
+            this.MarkAsAppend.Size = new System.Drawing.Size(116, 22);
+            this.MarkAsAppend.Text = "Append";
+            this.MarkAsAppend.Click += new System.EventHandler(this.MarkAsAppend_Click);
+            // 
+            // MarkAsReplace
+            // 
+            this.MarkAsReplace.Name = "MarkAsReplace";
+            this.MarkAsReplace.Size = new System.Drawing.Size(116, 22);
+            this.MarkAsReplace.Text = "Replace";
+            this.MarkAsReplace.Click += new System.EventHandler(this.MarkAsReplace_Click);
+            // 
+            // MarkAsDelete
+            // 
+            this.MarkAsDelete.Name = "MarkAsDelete";
+            this.MarkAsDelete.Size = new System.Drawing.Size(116, 22);
+            this.MarkAsDelete.Text = "Delete";
+            this.MarkAsDelete.Click += new System.EventHandler(this.MarkAsDelete_Click);
             // 
             // contextMenuFolderView
             // 
@@ -225,6 +279,12 @@ namespace eCTD_indexer
         private ToolStripMenuItem cmflOpen;
         private ToolStripMenuItem cmflInfo;
         private ToolStripMenuItem tsmiOpen;
+        private ToolStripMenuItem markAsToolStripMenuItem;
+        private ToolStripMenuItem MarkAsNew;
+        private ToolStripMenuItem MarkAsAppend;
+        private ToolStripMenuItem MarkAsReplace;
+        private ToolStripMenuItem MarkAsDelete;
+        private ToolStripSeparator toolStripSeparator1;
     }
 }
 

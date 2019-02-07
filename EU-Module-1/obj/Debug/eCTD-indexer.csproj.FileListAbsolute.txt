@@ -76,3 +76,7 @@ C:\Users\Fabian\Documents\Visual Studio 2013\Projects\ectd_indexer\EU-Module-1\o
 \\mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\obj\Debug\EU-Module-1.pdb
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\obj\Debug\eCTD-indexer.csproj.CopyComplete
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\obj\Debug\eCTD-indexer.csprojAssemblyReference.cache
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\System.Data.SQLite.dll
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\System.Data.SQLite.xml
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\System.Data.SQLite.dll.config
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\Resources\metadata.db

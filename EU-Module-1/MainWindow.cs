@@ -56,7 +56,13 @@ namespace eCTD_indexer
             this.dirs = new eCTD_Directories();
             this.files = new eCTD_Files();
             this.XMLCreate = new XML.Create(this.dirs);
-            this.DossierOpened = false;            
+            this.DossierOpened = false;
+            me = this;
+
+            // Inialize GUI labels
+            this.lStatus.Text = "";
+            this.lFile.Text = "";
+
         }
 
         // Global variables
@@ -67,6 +73,9 @@ namespace eCTD_indexer
         private String SeqDir;
         private String SeqNumber { get { return SeqDir.Substring(SeqDir.Length - 4, 4); } }
 
+        public void setFileInfo(String input) { lFile.Text = input; }
+        public void setStatusInfo(String input) { lStatus.Text = input;}
+        public static MainWindow me { get; set; }
 
         #region Event methods to enables/disables applicant and product name text boxes in line with country checkboxes
         private void checkBoxAT_CheckedChanged(object sender, EventArgs e)
@@ -847,6 +856,35 @@ namespace eCTD_indexer
                     // Create the directories
                     this.dirs.Create(this.SeqDir, memberStateList);
                     this.fileExplorerUserControl.PopulateTreeView(this.SeqDir);
+
+                    if (cd.WorkingDocuments)
+                    {
+                        if (Directory.Exists(this.SeqDir))
+                        {
+                            // Create the workingdocuments-Directory if it does not exist
+                            if (!Directory.Exists(this.SeqDir + "-workingdocuments"))
+                            {
+                                Directory.CreateDirectory(this.SeqDir + "-workingdocuments");
+                            }
+
+                            if (cd.LifeCycle)
+                            {
+                                // Create the ectdindex-Directory in the workingdirectory if it does not exist
+                                if (!Directory.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files"))
+                                {
+                                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files");
+                                }
+
+                                // Create a fresh new metadatabase if it does not exist
+                                if (!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                                {
+                                    File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db", false);
+                                }
+                            }
+
+                            this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
+                        }
+                    }                    
                     this.DossierOpened = true;
                 }
             }
@@ -1445,6 +1483,50 @@ namespace eCTD_indexer
         {
             UserDialog.Options opt = new UserDialog.Options();
             opt.ShowDialog();
+        }
+
+        private void addReplaceMetaDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if(Directory.Exists(this.SeqDir))
+            {
+                // Create the workingdocuments-Directory if it does not exist
+                if(!Directory.Exists(this.SeqDir + "-workingdocuments"))
+                {
+                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments");
+                }
+
+                // Create the ectdindex-Directory in the workingdirectory if it does not exist
+                if (!Directory.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files"))
+                {
+                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files");
+                }
+
+                // Create a fresh new metadatabase if it does not exist
+                if(!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                {
+                    File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db",false);
+                }
+                else
+                {
+                    if(DialogResult.Yes == MessageBox.Show("There is an existing metadatabase.\nectdindexer can replace this one with a new database. All data in the existing metadatabase will be lost. \n\n\nReset metadatabase?","Reset metadatabase?",MessageBoxButtons.YesNo,MessageBoxIcon.Question))
+                    {
+                        File.Delete(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db");
+                        File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db",true);
+                    }
+                }
+
+                // Refresh the view
+                this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
+                tsbRefreshFolderView_Click(null, null);
+            }
+        }
+
+        private void menuStrip_MenuActivate(object sender, EventArgs e)
+        {
+            if (!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            {
+
+            }
         }
     }
 

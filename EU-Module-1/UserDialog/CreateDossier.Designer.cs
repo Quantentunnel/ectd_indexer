@@ -32,11 +32,13 @@
             this.btCancel = new System.Windows.Forms.Button();
             this.tbSequencePath = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.cbWorkingDocuments = new System.Windows.Forms.CheckBox();
+            this.cbLifeCyle = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // btOK
             // 
-            this.btOK.Location = new System.Drawing.Point(76, 60);
+            this.btOK.Location = new System.Drawing.Point(76, 90);
             this.btOK.Name = "btOK";
             this.btOK.Size = new System.Drawing.Size(75, 25);
             this.btOK.TabIndex = 1;
@@ -46,7 +48,7 @@
             // 
             // btCancel
             // 
-            this.btCancel.Location = new System.Drawing.Point(157, 60);
+            this.btCancel.Location = new System.Drawing.Point(157, 90);
             this.btCancel.Name = "btCancel";
             this.btCancel.Size = new System.Drawing.Size(75, 25);
             this.btCancel.TabIndex = 2;
@@ -71,18 +73,44 @@
             this.label1.TabIndex = 3;
             this.label1.Text = "Sequence Path (e.g. 0000):";
             // 
+            // cbWorkingDocuments
+            // 
+            this.cbWorkingDocuments.AutoSize = true;
+            this.cbWorkingDocuments.Checked = true;
+            this.cbWorkingDocuments.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.cbWorkingDocuments.Location = new System.Drawing.Point(12, 41);
+            this.cbWorkingDocuments.Name = "cbWorkingDocuments";
+            this.cbWorkingDocuments.Size = new System.Drawing.Size(194, 17);
+            this.cbWorkingDocuments.TabIndex = 4;
+            this.cbWorkingDocuments.Text = "Create workingdocuments-Directory";
+            this.cbWorkingDocuments.UseVisualStyleBackColor = true;
+            this.cbWorkingDocuments.CheckedChanged += new System.EventHandler(this.cbWorkingDocuments_CheckedChanged);
+            // 
+            // cbLifeCyle
+            // 
+            this.cbLifeCyle.AutoSize = true;
+            this.cbLifeCyle.Checked = true;
+            this.cbLifeCyle.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.cbLifeCyle.Location = new System.Drawing.Point(12, 65);
+            this.cbLifeCyle.Name = "cbLifeCyle";
+            this.cbLifeCyle.Size = new System.Drawing.Size(232, 17);
+            this.cbLifeCyle.TabIndex = 5;
+            this.cbLifeCyle.Text = "Create a metadatabase for lifecycle funtions";
+            this.cbLifeCyle.UseVisualStyleBackColor = true;
+            // 
             // CreateDossier
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(329, 97);
+            this.ClientSize = new System.Drawing.Size(329, 127);
+            this.Controls.Add(this.cbLifeCyle);
+            this.Controls.Add(this.cbWorkingDocuments);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.tbSequencePath);
             this.Controls.Add(this.btCancel);
             this.Controls.Add(this.btOK);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
-            this.MaximumSize = new System.Drawing.Size(345, 135);
             this.MinimizeBox = false;
             this.MinimumSize = new System.Drawing.Size(345, 135);
             this.Name = "CreateDossier";
@@ -99,5 +127,7 @@
         private System.Windows.Forms.Button btCancel;
         private System.Windows.Forms.TextBox tbSequencePath;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.CheckBox cbWorkingDocuments;
+        private System.Windows.Forms.CheckBox cbLifeCyle;
     }
 }

@@ -22,6 +22,8 @@ namespace eCTD_indexer.UserDialogue
 
         // Public Attribute
         public String SequencePath { get { return this.path; } }
+        public bool WorkingDocuments { get { return this.cbWorkingDocuments.Checked; } }
+        public bool LifeCycle { get { return this.cbLifeCyle.Checked; } }
 
         private void btOK_Click(object sender, EventArgs e)
         {
@@ -57,6 +59,19 @@ namespace eCTD_indexer.UserDialogue
             // Close this Dialog without a verified result.
             this.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.Close();
+        }
+
+        private void cbWorkingDocuments_CheckedChanged(object sender, EventArgs e)
+        {
+            if(!cbWorkingDocuments.Checked)
+            {
+                cbLifeCyle.Checked = false;
+                cbLifeCyle.Enabled = false;
+            }
+            else
+            {
+                cbLifeCyle.Enabled = true;
+            }
         }
     }
 }

@@ -414,5 +414,15 @@ namespace eCTD_indexer.Properties {
                 return ResourceManager.GetString("ich_ectd_3_2", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Byte[].
+        /// </summary>
+        internal static byte[] metadata {
+            get {
+                object obj = ResourceManager.GetObject("metadata", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

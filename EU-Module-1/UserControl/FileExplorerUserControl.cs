@@ -48,7 +48,8 @@ namespace eCTD_indexer
         private bool privateDragAndDrop;
         private String privateDragSource;
         private eCTD_Directories eCTDirs;
-        private List<String> ExpandedTreeNodeStructure; 
+        private List<String> ExpandedTreeNodeStructure;
+        private Database.DB_Access dba;
 
         /// <summary>
         /// Refresh the view on the folders and files.
@@ -66,6 +67,7 @@ namespace eCTD_indexer
         {
             this.FileListView.Clear();
             this.FolderView.Nodes.Clear();
+            this.dba = null;
         }
         
         public void PopulateTreeView()
@@ -133,8 +135,12 @@ namespace eCTD_indexer
         /// <param name="_rootDirectory"></param>
         public void PopulateTreeView(String _rootDirectory)
         {
-            //this.rootDirectory = _rootDirectory;
-            //this.rootDirectory = this.rootDirectory.Substring(0, this.rootDirectory.Length - 4);
+            // If the database object is null and we get the path to the working documents
+            if(this.dba == null && _rootDirectory.EndsWith("workingdocuments") )
+            {
+                this.dba = new Database.DB_Access(_rootDirectory + @"\ectdindexer-files");
+            }
+
             this.setRootDirectory(_rootDirectory);
             TreeNode rootnode;
 
@@ -645,6 +651,93 @@ namespace eCTD_indexer
             SizeLastColumn((ListView)sender);
         }
         #endregion
+
+        private void MarkAsNew_Click(object sender, EventArgs e)
+        {
+            this.SaveLifecycleStatus("new");
+        }
+
+        private void MarkAsAppend_Click(object sender, EventArgs e)
+        {
+            this.SaveLifecycleStatus("append");
+        }
+
+        private void MarkAsReplace_Click(object sender, EventArgs e)
+        {
+            this.SaveLifecycleStatus("replace");
+        }
+
+        private void MarkAsDelete_Click(object sender, EventArgs e)
+        {
+            this.SaveLifecycleStatus("delete");
+        }
+
+        private void SaveLifecycleStatus(String status)
+        {
+            if (this.FileListView.SelectedItems.Count == 1)
+            {
+                if (Directory.Exists(this.selectedpath + "-workingdocuments"))
+                {
+                    if (Directory.Exists(this.selectedpath + "-workingdocuments\\ectdindexer-files"))
+                    {
+                        if (File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        {
+                            this.dba.setLifecycleStatus(this.selectedpath, FileListView.SelectedItems[0].Text, status);
+                            FileListView_ItemSelectionChanged(null, null);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void FileListView_ItemSelectionChanged(object sender, ListViewItemSelectionChangedEventArgs e)
+        {
+            if (FileListView.SelectedItems.Count > 0)
+            {
+                // Create new FileInfo object
+                FileInfo f = new FileInfo(this.selectedpath + @"\" + FileListView.SelectedItems[0].Text);
+                MainWindow.me.setFileInfo(f.FullName);
+
+                if (Directory.Exists(this.selectedpath + "-workingdocuments"))
+                {
+                    if (Directory.Exists(this.selectedpath + "-workingdocuments\\ectdindexer-files"))
+                    {
+                        if (File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        {
+                            MainWindow.me.setStatusInfo(this.dba.getFileStatus(this.selectedpath, FileListView.SelectedItems[0].Text));
+                        }
+                        else
+                        {
+                            MainWindow.me.setStatusInfo("No metadatabase available.");
+                        }
+                    }
+                    else
+                    {
+                        MainWindow.me.setStatusInfo("No metadatabase available.");
+                    }
+                }
+                else
+                {
+                    MainWindow.me.setStatusInfo("No metadatabase available.");
+                }
+            }
+            else
+            {
+                MainWindow.me.setStatusInfo("");
+                MainWindow.me.setFileInfo("");
+            }
+        }
+
+        private void contextMenuFileListView_Opening(object sender, CancelEventArgs e)
+        {
+            if (!File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            {
+                markAsToolStripMenuItem.Enabled = false;
+            } else
+            {
+                markAsToolStripMenuItem.Enabled = true;
+            }
+        }
     }
 
     public class MyComparer : IComparer<DirectoryInfo>
