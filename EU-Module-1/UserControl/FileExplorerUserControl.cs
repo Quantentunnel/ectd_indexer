@@ -51,6 +51,9 @@ namespace eCTD_indexer
         private List<String> ExpandedTreeNodeStructure;
         private Database.DB_Access dba;
 
+        // public variables
+        public String SeqPath { get; set; }
+
         /// <summary>
         /// Refresh the view on the folders and files.
         /// </summary>
@@ -676,11 +679,11 @@ namespace eCTD_indexer
         {
             if (this.FileListView.SelectedItems.Count == 1)
             {
-                if (Directory.Exists(this.selectedpath + "-workingdocuments"))
+                if (Directory.Exists(this.SeqPath + "-workingdocuments"))
                 {
-                    if (Directory.Exists(this.selectedpath + "-workingdocuments\\ectdindexer-files"))
+                    if (Directory.Exists(this.SeqPath + "-workingdocuments\\ectdindexer-files"))
                     {
-                        if (File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        if (File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
                             this.dba.setLifecycleStatus(this.selectedpath, FileListView.SelectedItems[0].Text, status);
                             FileListView_ItemSelectionChanged(null, null);
@@ -698,11 +701,11 @@ namespace eCTD_indexer
                 FileInfo f = new FileInfo(this.selectedpath + @"\" + FileListView.SelectedItems[0].Text);
                 MainWindow.me.setFileInfo(f.FullName);
 
-                if (Directory.Exists(this.selectedpath + "-workingdocuments"))
+                if (Directory.Exists(this.SeqPath + "-workingdocuments"))
                 {
-                    if (Directory.Exists(this.selectedpath + "-workingdocuments\\ectdindexer-files"))
+                    if (Directory.Exists(this.SeqPath + "-workingdocuments\\ectdindexer-files"))
                     {
-                        if (File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        if (File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
                             MainWindow.me.setStatusInfo(this.dba.getFileStatus(this.selectedpath, FileListView.SelectedItems[0].Text));
                         }
@@ -730,7 +733,7 @@ namespace eCTD_indexer
 
         private void contextMenuFileListView_Opening(object sender, CancelEventArgs e)
         {
-            if (!File.Exists(this.selectedpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            if (!File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
                 markAsToolStripMenuItem.Enabled = false;
             } else

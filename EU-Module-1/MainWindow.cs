@@ -627,6 +627,9 @@ namespace eCTD_indexer
                         Properties.Settings.Default.Save();
                     }
 
+                    // Save the Path to the Seq in the fileExplorer
+                    this.fileExplorerUserControl.SeqPath = fb.SelectedPath + "\\" + cd.SelectedSequence;
+
                     // Set the Dossier as Opened
                     this.DossierOpened = true;
                 }
@@ -840,6 +843,8 @@ namespace eCTD_indexer
                 {
                     // Set the Sequence Directory
                     this.SeqDir = fb.SelectedPath + @"\" + cd.SequencePath;
+                    // Save the Path to the Seq in the fileExplorer
+                    this.fileExplorerUserControl.SeqPath = this.SeqDir;
 
                     List<string> memberStateList = new List<string>();
                     foreach (Control chkbx in this.Controls)
@@ -1408,6 +1413,8 @@ namespace eCTD_indexer
                 // 0000-workingdocuments
                 this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
 
+                // Save the SeqFolder in the fileExplorer
+                this.fileExplorerUserControl.SeqPath = this.SeqDir;
 
                 // Load the xml file / xml data
                 if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))

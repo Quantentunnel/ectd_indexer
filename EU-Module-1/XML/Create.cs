@@ -60,6 +60,14 @@ namespace eCTD_indexer.XML
             //count files in m1 folder
             int m1FileNumber = files.Count(envelope.m1euPath);
 
+            // Metadata
+            Database.DB_Access dba = null;
+            String seqpath = envelope.m1euPath.Substring(0, envelope.m1euPath.Length - 6);
+            if (File.Exists(seqpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            {
+                dba = new Database.DB_Access(seqpath+ "-workingdocuments" + "\\ectdindexer-files");
+            }
+
             //count directories under m1/eu to determine size of dirListArrayM1
             int arraySize = directories.Count(envelope.m1euPath);
 
@@ -107,54 +115,18 @@ namespace eCTD_indexer.XML
                 MD5Calculator checksum = new MD5Calculator();
                 string sum = checksum.ComputeMD5Checksum(f.FullName);
                 string modifiedFileID = "";
+
+                // Standard operation
                 string operation = "new";
 
-                //Lifecycle operations, replace, append and delete
-                if (name.Contains("replace("))
+                #region Lifecycle operations, replace, append and delete
+                if (dba != null)
                 {
-                    string prevSequence = envelope.sequencePath.Substring(0, envelope.sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar + "eu" + Path.DirectorySeparatorChar + "eu-regional.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("replace")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    modifiedFileID = "../../../" + name.Substring(name.IndexOf("(") + 1, 4) + "/m1/eu/eu-regional.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "replace";
+                    operation = dba.getFileStatus(f.DirectoryName, f.Name);
+                    if(operation == "Not yet defined") { operation = "new"; }
+                } 
+                #endregion
 
-                    //rename file to remove the replace pointer
-                    string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("replace")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    File.Move(f.FullName, newFileName);
-                    name = newFileName;
-                    index = name.IndexOf(envelope.sequence);
-                    shortname = name.Substring(index + 11);
-                    shortname = shortname.Replace("\\", "/");
-                }
-                if (name.Contains("append("))
-                {
-                    string prevSequence = envelope.sequencePath.Substring(0, envelope.sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar + "eu" + Path.DirectorySeparatorChar + "eu-regional.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("append")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    modifiedFileID = "../../../" + name.Substring(name.IndexOf("(") + 1, 4) + "/m1/eu/eu-regional.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "append";
-
-                    //rename file to remove the replace pointer
-                    string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("append")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    File.Move(f.FullName, newFileName);
-                    name = newFileName;
-                    index = name.IndexOf(envelope.sequence);
-                    shortname = name.Substring(index + 11);
-                    shortname = shortname.Replace("\\", "/");
-                }
-                if (name.Contains("delete("))
-                {
-                    string prevSequence = envelope.sequencePath.Substring(0, envelope.sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar + "eu" + Path.DirectorySeparatorChar + "eu-regional.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("delete")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    //string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("delete")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    //name = newFileName;
-                    modifiedFileID = "../../../" + name.Substring(name.IndexOf("(") + 1, 4) + "/m1/eu/eu-regional.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "delete";
-                    shortname = "";
-                    sum = "";
-                    File.Delete(f.FullName);
-                }
                 filenameListArray[counterX, 0] = name;
                 filenameListArray[counterX, 1] = shortname;
                 filenameListArray[counterX, 2] = sum;
@@ -1020,6 +992,13 @@ namespace eCTD_indexer.XML
             //count directories in sequence to determine array size for dirListArray
             int arraySize = directories.Count(sequencePath);
 
+            // Metadata
+            Database.DB_Access dba = null;
+            if (File.Exists(sequencePath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            {
+                dba = new Database.DB_Access(sequencePath + "-workingdocuments" + "\\ectdindexer-files");
+            }
+
             //system to list unindexed files
             bool indexed = false;
             string[] unIndexed; //array of unindexed files
@@ -1078,53 +1057,15 @@ namespace eCTD_indexer.XML
                 string sum = checksum.ComputeMD5Checksum(f.FullName);
                 string modifiedFileID = "";
                 string operation = "new";
-                
-                //Lifecycle operations, replace, append and delete
-                if (name.Contains("replace("))
-                {
-                    string prevSequence = sequencePath.Substring(0, sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "index.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("replace")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    modifiedFileID = "../" + name.Substring(name.IndexOf("(") + 1, 4) + "/index.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "replace";
 
-                    //rename file to remove the replace pointer
-                    string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("replace")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    File.Move(f.FullName, newFileName);
-                    name = newFileName;
-                    index = name.IndexOf(sequence);
-                    shortname = name.Substring(index + 5);
-                    shortname = shortname.Replace("\\", "/");
-                }
-                if (name.Contains("append("))
+                #region Lifecycle operations, replace, append and delete
+                if (dba != null)
                 {
-                    string prevSequence = sequencePath.Substring(0, sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "index.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("append")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    modifiedFileID = "../" + name.Substring(name.IndexOf("(") + 1, 4) + "/index.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "append";
+                    operation = dba.getFileStatus(f.DirectoryName, f.Name);
+                    if (operation == "Not yet defined") { operation = "new"; }
+                }
+                #endregion
 
-                    //rename file to remove the replace pointer
-                    string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("append")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    File.Move(f.FullName, newFileName);
-                    name = newFileName;
-                    index = name.IndexOf(sequence);
-                    shortname = name.Substring(index + 5);
-                    shortname = shortname.Replace("\\", "/");
-                }
-                if (name.Contains("delete("))
-                {
-                    string prevSequence = sequencePath.Substring(0, sequencePath.Length - 4) + name.Substring(name.IndexOf("(") + 1, 4) + Path.DirectorySeparatorChar + "index.xml";
-                    string prevLeafPath = shortname.Substring(0, shortname.IndexOf("delete")) + shortname.Substring(shortname.IndexOf(")") + 1, shortname.Length - (shortname.IndexOf(")") + 1));
-                    Sort repDelID = new Sort();
-                    //string newFileName = f.FullName.Substring(0, f.FullName.IndexOf("delete")) + f.FullName.Substring(f.FullName.IndexOf(")") + 1, f.FullName.Length - (f.FullName.IndexOf(")") + 1));
-                    //name = newFileName;
-                    modifiedFileID = "../" + name.Substring(name.IndexOf("(") + 1, 4) + "/index.xml#" + repDelID.modifiedFile(prevSequence, prevLeafPath);
-                    operation = "delete";
-                    shortname = "";
-                    sum = "";
-                    File.Delete(f.FullName);
-                }
                 filenameListArray[counterX, 0] = name;
                 filenameListArray[counterX, 1] = shortname;
                 filenameListArray[counterX, 2] = sum;
