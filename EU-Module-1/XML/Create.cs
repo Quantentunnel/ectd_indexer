@@ -123,7 +123,18 @@ namespace eCTD_indexer.XML
                 if (dba != null)
                 {
                     operation = dba.getFileStatus(f.DirectoryName, f.Name);
-                    if(operation == "Not yet defined") { operation = "new"; }
+                   
+                    if (operation == "Not yet defined") { operation = "new"; }
+
+                    if (operation.CompareTo("new") != 0)
+                    {
+                        Random r = new Random();
+                        modifiedFileID = "../0001/index.xml#" + r.Next(2, 64999).ToString(); ;
+                    }
+                    else
+                    {
+                        modifiedFileID = "";
+                    }
                 } 
                 #endregion
 
@@ -1062,7 +1073,18 @@ namespace eCTD_indexer.XML
                 if (dba != null)
                 {
                     operation = dba.getFileStatus(f.DirectoryName, f.Name);
+
                     if (operation == "Not yet defined") { operation = "new"; }
+
+                    if (operation.CompareTo("new") != 0)
+                    {
+                        Random r = new Random();
+                        modifiedFileID = "../0001/index.xml#" +  r.Next(2, 64999).ToString();
+                    }
+                    else
+                    {
+                        modifiedFileID = "";
+                    }
                 }
                 #endregion
 

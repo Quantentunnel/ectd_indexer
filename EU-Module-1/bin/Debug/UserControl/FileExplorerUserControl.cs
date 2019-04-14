@@ -733,12 +733,27 @@ namespace eCTD_indexer
 
         private void contextMenuFileListView_Opening(object sender, CancelEventArgs e)
         {
+            // Does the database exist? If yes, then the user can mark files.
             if (!File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
                 markAsToolStripMenuItem.Enabled = false;
             } else
             {
                 markAsToolStripMenuItem.Enabled = true;
+
+                // The xml files can not be marked
+                if (FileListView.SelectedItems.Count > 0)
+                {
+                    if (FileListView.SelectedItems[0].Text == "index.xml" ||
+                       FileListView.SelectedItems[0].Text == "eu - regional.xml")
+                    {
+                        markAsToolStripMenuItem.Enabled = false;
+                    }
+                    else
+                    {
+                        markAsToolStripMenuItem.Enabled = true;
+                    }
+                }
             }
         }
     }
