@@ -51,3 +51,5 @@ C:\Users\Fabian\Documents\Visual Studio 2013\Projects\ectd_indexer\eCTD_Diagnost
 \\mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\eCTD_Diagnostic\obj\Debug\eCTD_Diagnostic.dll
 \\mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\eCTD_Diagnostic\obj\Debug\eCTD_Diagnostic.pdb
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\eCTD_Diagnostic\obj\Debug\eCTD_Diagnostic.csprojAssemblyReference.cache
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\eCTD_Diagnostic\obj\Debug\eCTD_ResultDetails.g.cs
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\eCTD_Diagnostic\obj\Debug\eCTD_ResultDetails.baml

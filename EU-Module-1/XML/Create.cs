@@ -296,7 +296,7 @@ namespace eCTD_indexer.XML
                             if (filenameListArray[p, 0].Contains("131-spclabelpl"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("131-spclabelpl") + 1];
-                                envelope.language = filePathList[filePathList.IndexOf("131-spclabelpl") + 2];
+                                envelope.language = filePathList[filePathList.IndexOf("131-spclabelpl") + 1];
 
                                 if (filenameListArray[p, 0].Contains("-spc.") || filenameListArray[p, 0].Contains("-spc-")) envelope.m131identifier = "spc";
                                 if (filenameListArray[p, 0].Contains("-annex2")) envelope.m131identifier = "annex2";
