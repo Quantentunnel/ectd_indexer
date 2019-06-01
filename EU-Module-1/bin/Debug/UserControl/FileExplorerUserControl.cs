@@ -138,12 +138,6 @@ namespace eCTD_indexer
         /// <param name="_rootDirectory"></param>
         public void PopulateTreeView(String _rootDirectory)
         {
-            // If the database object is null and we get the path to the working documents
-            if(this.dba == null && _rootDirectory.EndsWith("workingdocuments") )
-            {
-                this.dba = new Database.DB_Access(_rootDirectory + @"\ectdindexer-files");
-            }
-
             this.setRootDirectory(_rootDirectory);
             TreeNode rootnode;
 
@@ -155,6 +149,22 @@ namespace eCTD_indexer
                 GetDirectories(info.GetDirectories(), rootnode);
                 FolderView.Nodes.Add(rootnode); 
             } 
+        }
+
+        /// <summary>
+        /// Load the database so that we have access from here.
+        /// </summary>
+        /// <param name="seqroot"></param>
+        public void LoadDB(String seqroot)
+        {
+            // If the database object is null and we get the path to the working documents
+            if (this.dba == null)
+            {
+                if (seqroot != "")
+                {
+                    this.dba = new Database.DB_Access(seqroot + @"\workingdocuments\ectdindexer-files");
+                }
+            }
         }
 
         /// <summary>
@@ -679,11 +689,13 @@ namespace eCTD_indexer
         {
             if (this.FileListView.SelectedItems.Count == 1)
             {
-                if (Directory.Exists(this.SeqPath + "-workingdocuments"))
+                String root = this.SeqPath.Substring(0, this.SeqPath.Length - 4) + "\\";
+
+                if (Directory.Exists(root + "workingdocuments"))
                 {
-                    if (Directory.Exists(this.SeqPath + "-workingdocuments\\ectdindexer-files"))
+                    if (Directory.Exists(root + "workingdocuments\\ectdindexer-files"))
                     {
-                        if (File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
                             this.dba.setLifecycleStatus(this.selectedpath, FileListView.SelectedItems[0].Text, status);
                             FileListView_ItemSelectionChanged(null, null);
@@ -700,12 +712,13 @@ namespace eCTD_indexer
                 // Create new FileInfo object
                 FileInfo f = new FileInfo(this.selectedpath + @"\" + FileListView.SelectedItems[0].Text);
                 MainWindow.me.setFileInfo(f.FullName);
+                String root = this.SeqPath.Substring(0, this.SeqPath.Length - 4) + "\\";
 
-                if (Directory.Exists(this.SeqPath + "-workingdocuments"))
+                if (Directory.Exists(root + "workingdocuments"))
                 {
-                    if (Directory.Exists(this.SeqPath + "-workingdocuments\\ectdindexer-files"))
+                    if (Directory.Exists(root + "workingdocuments\\ectdindexer-files"))
                     {
-                        if (File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                        if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
                             MainWindow.me.setStatusInfo(this.dba.getFileStatus(this.selectedpath, FileListView.SelectedItems[0].Text));
                         }
@@ -734,7 +747,8 @@ namespace eCTD_indexer
         private void contextMenuFileListView_Opening(object sender, CancelEventArgs e)
         {
             // Does the database exist? If yes, then the user can mark files.
-            if (!File.Exists(this.SeqPath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            String root = this.SeqPath.Substring(0, this.SeqPath.Length - 4) + "\\";
+            if (!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
                 markAsToolStripMenuItem.Enabled = false;
             } else
@@ -745,7 +759,14 @@ namespace eCTD_indexer
                 if (FileListView.SelectedItems.Count > 0)
                 {
                     if (FileListView.SelectedItems[0].Text == "index.xml" ||
-                       FileListView.SelectedItems[0].Text == "eu - regional.xml")
+                       FileListView.SelectedItems[0].Text == "eu-regional.xml" ||
+                       FileListView.SelectedItems[0].Text == "eu-leaf.mod" ||
+                       FileListView.SelectedItems[0].Text == "eu-regional.dtd" ||
+                       FileListView.SelectedItems[0].Text == "ich-ectd-3-2.dtd" ||
+                       FileListView.SelectedItems[0].Text == "eu-envelope.mod" ||
+                       FileListView.SelectedItems[0].Text == "ectd-2-0.xsl" ||
+                       FileListView.SelectedItems[0].Text == "eu-regional.xsl" ||
+                       FileListView.SelectedItems[0].Text == "index-md5.txt")
                     {
                         markAsToolStripMenuItem.Enabled = false;
                     }

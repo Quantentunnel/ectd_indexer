@@ -63,9 +63,10 @@ namespace eCTD_indexer.XML
             // Metadata
             Database.DB_Access dba = null;
             String seqpath = envelope.m1euPath.Substring(0, envelope.m1euPath.Length - 6);
-            if (File.Exists(seqpath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            String root = seqpath.Substring(0, seqpath.Length - 4) + "\\";
+            if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
-                dba = new Database.DB_Access(seqpath+ "-workingdocuments" + "\\ectdindexer-files");
+                dba = new Database.DB_Access(root+ "workingdocuments" + "\\ectdindexer-files");
             }
 
             //count directories under m1/eu to determine size of dirListArrayM1
@@ -1005,9 +1006,10 @@ namespace eCTD_indexer.XML
 
             // Metadata
             Database.DB_Access dba = null;
-            if (File.Exists(sequencePath + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            String root = sequencePath.Substring(0, sequencePath.Length - 4) + "\\";
+            if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
-                dba = new Database.DB_Access(sequencePath + "-workingdocuments" + "\\ectdindexer-files");
+                dba = new Database.DB_Access(root + "workingdocuments" + "\\ectdindexer-files");
             }
 
             //system to list unindexed files

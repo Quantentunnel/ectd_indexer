@@ -617,6 +617,9 @@ namespace eCTD_indexer
                     // Store the Sequence Directory
                     this.SeqDir = fb.SelectedPath + "\\" + cd.SelectedSequence;
 
+                    // Open Database
+                    this.fileExplorerUserControl.LoadDB(fb.SelectedPath);
+
                     // Load the xml file / xml data
                     if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))
                     {
@@ -1416,6 +1419,10 @@ namespace eCTD_indexer
                 // Save the SeqFolder in the fileExplorer
                 this.fileExplorerUserControl.SeqPath = this.SeqDir;
 
+                // Open Database
+                String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4);
+                this.fileExplorerUserControl.LoadDB(root);
+
                 // Load the xml file / xml data
                 if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))
                 {
@@ -1494,43 +1501,47 @@ namespace eCTD_indexer
 
         private void addReplaceMetaDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if(Directory.Exists(this.SeqDir))
+            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
+
+            if (Directory.Exists(root))
             {
                 // Create the workingdocuments-Directory if it does not exist
-                if(!Directory.Exists(this.SeqDir + "-workingdocuments"))
+                if(!Directory.Exists(root + "workingdocuments"))
                 {
-                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments");
+                    Directory.CreateDirectory(root + "workingdocuments");
                 }
 
                 // Create the ectdindex-Directory in the workingdirectory if it does not exist
-                if (!Directory.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files"))
+                if (!Directory.Exists(root + "workingdocuments" + "\\ectdindexer-files"))
                 {
-                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files");
+                    Directory.CreateDirectory(root + "workingdocuments" + "\\ectdindexer-files");
                 }
 
                 // Create a fresh new metadatabase if it does not exist
-                if(!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                if(!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                 {
-                    File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db",false);
+                    File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db",false);
                 }
                 else
                 {
                     if(DialogResult.Yes == MessageBox.Show("There is an existing metadatabase.\nectdindexer can replace this one with a new database. All data in the existing metadatabase will be lost. \n\n\nReset metadatabase?","Reset metadatabase?",MessageBoxButtons.YesNo,MessageBoxIcon.Question))
                     {
-                        File.Delete(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db");
-                        File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db",true);
+                        File.Delete(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db");
+                        File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db",true);
                     }
                 }
 
                 // Refresh the view
-                this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
+                //this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
                 tsbRefreshFolderView_Click(null, null);
             }
         }
 
         private void menuStrip_MenuActivate(object sender, EventArgs e)
         {
-            if (!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
+
+            if (!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
             {
 
             }
