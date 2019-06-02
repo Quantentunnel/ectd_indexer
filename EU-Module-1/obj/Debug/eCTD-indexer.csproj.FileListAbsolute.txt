@@ -80,3 +80,4 @@ C:\Users\Fabian\Documents\Visual Studio 2013\Projects\ectd_indexer\EU-Module-1\o
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\System.Data.SQLite.xml
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\System.Data.SQLite.dll.config
 \\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\bin\Debug\Resources\metadata.db
+\\Mac\Home\Documents\Visual Studio 2017\Projects\ectd_indexer\EU-Module-1\obj\Debug\eCTD_indexer.UserDialog.FileDetails.resources

@@ -697,8 +697,38 @@ namespace eCTD_indexer
                     {
                         if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
-                            this.dba.setLifecycleStatus(this.selectedpath, FileListView.SelectedItems[0].Text, status);
-                            FileListView_ItemSelectionChanged(null, null);
+
+                            Database.LifecycleData lifecycle = this.dba.getLifecycleStatus("01");
+
+                            // If the item is not found in the Database.
+                            if (lifecycle == null)
+                            {
+                                // Create new LifecycelData Object
+                                lifecycle = new Database.LifecycleData();
+
+                                // Save the status (new, append, replace, delete)
+                                lifecycle.LifecycleAction = status;
+
+                                // Save the Filename
+                                lifecycle.Filename = FileListView.SelectedItems[0].Text;
+
+                                // Save the Path to the File
+                                lifecycle.Path = this.selectedpath;
+
+                                // Calculate the SHA-256 Hash value
+                                lifecycle.SHA256 = XML.SHA256.GetChecksum(lifecycle.Path + @"\" + lifecycle.Filename);
+
+                                // Current Sequence Number
+                                lifecycle.Seq = MainWindow.me.SeqNumber;
+                            }
+                            // if the item is found in the database.
+                            else
+                            {
+                                lifecycle.LifecycleAction = status;
+                            }
+
+                            UserDialog.FileDetails mf = new UserDialog.FileDetails(lifecycle, this.dba);
+                            mf.ShowDialog();
                         }
                     }
                 }
@@ -720,6 +750,7 @@ namespace eCTD_indexer
                     {
                         if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                         {
+                            if(this.dba == null) { this.LoadDB(root); }
                             MainWindow.me.setStatusInfo(this.dba.getFileStatus(this.selectedpath, FileListView.SelectedItems[0].Text));
                         }
                         else

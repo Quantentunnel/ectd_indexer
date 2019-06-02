@@ -90,6 +90,7 @@
   <ItemGroup>
     <Compile Include="Database\DB_Access.cs" />
     <Compile Include="QuickCheck\071_Filenames.cs" />
+    <Compile Include="Toolbox.cs" />
     <Compile Include="UserDialog\AboutBox.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -150,6 +151,9 @@
     <EmbeddedResource Include="UserDialog\CreateDirectory.resx">
       <DependentUpon>CreateDirectory.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="UserDialog\FileDetails.resx">
+      <DependentUpon>FileDetails.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="UserDialog\Options.resx">
       <DependentUpon>Options.cs</DependentUpon>
     </EmbeddedResource>
@@ -187,6 +191,12 @@
     </Compile>
     <Compile Include="UserDialog\CreateDirectory.Designer.cs">
       <DependentUpon>CreateDirectory.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UserDialog\FileDetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UserDialog\FileDetails.Designer.cs">
+      <DependentUpon>FileDetails.cs</DependentUpon>
     </Compile>
     <Compile Include="UserDialog\Options.cs">
       <SubType>Form</SubType>
@@ -308,7 +318,24 @@
   <ItemGroup>
     <None Include="Resources\Actions-edit-copy-icon.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="Resources\Actions-dialog-ok-apply-icon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Actions-edit-delete-icon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Apps-knotes-icon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Status-object-locked-icon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Status-object-unlocked-icon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Actions-go-next-icon.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\System.Data.SQLite.Core.1.0.109.2\build\net451\System.Data.SQLite.Core.targets" Condition="Exists('..\packages\System.Data.SQLite.Core.1.0.109.2\build\net451\System.Data.SQLite.Core.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

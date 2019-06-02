@@ -63,6 +63,16 @@ namespace eCTD_indexer.Properties {
         /// <summary>
         ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap Actions_dialog_ok_apply_icon {
+            get {
+                object obj = ResourceManager.GetObject("Actions_dialog_ok_apply_icon", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Actions_document_open_icon_72x72 {
             get {
                 object obj = ResourceManager.GetObject("Actions_document_open_icon_72x72", resourceCulture);
@@ -93,6 +103,16 @@ namespace eCTD_indexer.Properties {
         /// <summary>
         ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap Actions_edit_delete_icon {
+            get {
+                object obj = ResourceManager.GetObject("Actions_edit_delete_icon", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Actions_folder_new_icon_72x72 {
             get {
                 object obj = ResourceManager.GetObject("Actions_folder_new_icon_72x72", resourceCulture);
@@ -106,6 +126,16 @@ namespace eCTD_indexer.Properties {
         internal static System.Drawing.Bitmap Actions_go_jump_icon_72x72 {
             get {
                 object obj = ResourceManager.GetObject("Actions_go_jump_icon_72x72", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Actions_go_next_icon {
+            get {
+                object obj = ResourceManager.GetObject("Actions_go_next_icon", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -422,6 +452,26 @@ namespace eCTD_indexer.Properties {
             get {
                 object obj = ResourceManager.GetObject("metadata", resourceCulture);
                 return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Status_object_locked_icon {
+            get {
+                object obj = ResourceManager.GetObject("Status_object_locked_icon", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Ressource vom Typ System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Status_object_unlocked_icon {
+            get {
+                object obj = ResourceManager.GetObject("Status_object_unlocked_icon", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
             }
         }
     }

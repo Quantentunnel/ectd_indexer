@@ -57,12 +57,13 @@ namespace eCTD_indexer
             this.files = new eCTD_Files();
             this.XMLCreate = new XML.Create(this.dirs);
             this.DossierOpened = false;
-            me = this;
 
             // Inialize GUI labels
             this.lStatus.Text = "";
             this.lFile.Text = "";
 
+            // Create static link to the MainWindow object
+            me = this;
         }
 
         // Global variables
@@ -71,10 +72,11 @@ namespace eCTD_indexer
         private XML.Create XMLCreate;
         private bool DossierOpened;
         private String SeqDir;
-        private String SeqNumber { get { return SeqDir.Substring(SeqDir.Length - 4, 4); } }
 
+        public String SeqNumber { get { return SeqDir.Substring(SeqDir.Length - 4, 4); } }
         public void setFileInfo(String input) { lFile.Text = input; }
         public void setStatusInfo(String input) { lStatus.Text = input;}
+        public String DossierID { get { return this.tbIdentifier.Text; } }
         public static MainWindow me { get; set; }
 
         #region Event methods to enables/disables applicant and product name text boxes in line with country checkboxes
@@ -844,6 +846,12 @@ namespace eCTD_indexer
                 UserDialogue.CreateDossier cd = new UserDialogue.CreateDossier();
                 if (cd.ShowDialog() == DialogResult.OK)
                 {
+                    // Close a dossier if one is open
+                    if (this.DossierOpened)
+                    {
+                        tsbCloseDossier_Click(sender, e);
+                    }
+
                     // Set the Sequence Directory
                     this.SeqDir = fb.SelectedPath + @"\" + cd.SequencePath;
                     // Save the Path to the Seq in the fileExplorer
@@ -869,31 +877,42 @@ namespace eCTD_indexer
                     {
                         if (Directory.Exists(this.SeqDir))
                         {
+                            // Get root
+                            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
+
                             // Create the workingdocuments-Directory if it does not exist
-                            if (!Directory.Exists(this.SeqDir + "-workingdocuments"))
+                            if (!Directory.Exists(root + "workingdocuments"))
                             {
-                                Directory.CreateDirectory(this.SeqDir + "-workingdocuments");
+                                Directory.CreateDirectory(root + "workingdocuments");
                             }
 
                             if (cd.LifeCycle)
                             {
                                 // Create the ectdindex-Directory in the workingdirectory if it does not exist
-                                if (!Directory.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files"))
+                                if (!Directory.Exists(root + "workingdocuments" + "\\ectdindexer-files"))
                                 {
-                                    Directory.CreateDirectory(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files");
+                                    Directory.CreateDirectory(root + "workingdocuments" + "\\ectdindexer-files");
                                 }
-
+                                
                                 // Create a fresh new metadatabase if it does not exist
-                                if (!File.Exists(this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                                if (!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
                                 {
-                                    File.Copy("Resources/metadata.db", this.SeqDir + "-workingdocuments" + "\\ectdindexer-files\\metadata.db", false);
+                                    try
+                                    {
+                                        File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db", false);
+                                    }
+                                    catch { MessageBox.Show("An unexpected error appeared when trying to copy the new database to the dossier. Working on the sequence is working but not with database support.", "Error Copy Database", MessageBoxButtons.OK, MessageBoxIcon.Error) ; }
                                 }
                             }
 
-                            this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
+                            this.fileExplorerUserControl.PopulateTreeView(root + "workingdocuments");
                         }
                     }                    
                     this.DossierOpened = true;
+
+                    // Remember the last dossier
+                    Properties.Settings.Default.LastDossier = this.SeqDir;
+                    Properties.Settings.Default.Save();
                 }
             }
         }
@@ -1426,11 +1445,11 @@ namespace eCTD_indexer
                 // Load the xml file / xml data
                 if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))
                 {
-                    this.loadXMLData();
-
-                    // Set the Dossier as Opened
-                    this.DossierOpened = true;
+                    this.loadXMLData();                    
                 }
+
+                // Set the Dossier as Opened
+                this.DossierOpened = true;
             }
             catch
             {
@@ -1534,16 +1553,6 @@ namespace eCTD_indexer
                 // Refresh the view
                 //this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
                 tsbRefreshFolderView_Click(null, null);
-            }
-        }
-
-        private void menuStrip_MenuActivate(object sender, EventArgs e)
-        {
-            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
-
-            if (!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
-            {
-
             }
         }
     }

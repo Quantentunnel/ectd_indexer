@@ -49,7 +49,6 @@ namespace eCTD_indexer
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainWindow));
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
-            this.fileExplorerUserControl = new eCTD_indexer.FileExplorerUserControl();
             this.lFile = new System.Windows.Forms.Label();
             this.label11 = new System.Windows.Forms.Label();
             this.lStatus = new System.Windows.Forms.Label();
@@ -230,6 +229,7 @@ namespace eCTD_indexer
             this.textBoxLVApp = new System.Windows.Forms.TextBox();
             this.textBoxITApp = new System.Windows.Forms.TextBox();
             this.checkBoxHU = new System.Windows.Forms.CheckBox();
+            this.fileExplorerUserControl = new eCTD_indexer.FileExplorerUserControl();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -407,8 +407,8 @@ namespace eCTD_indexer
             this.splitContainer1.Panel2.Controls.Add(this.textBoxLVApp);
             this.splitContainer1.Panel2.Controls.Add(this.textBoxITApp);
             this.splitContainer1.Panel2.Controls.Add(this.checkBoxHU);
-            this.splitContainer1.Size = new System.Drawing.Size(962, 614);
-            this.splitContainer1.SplitterDistance = 181;
+            this.splitContainer1.Size = new System.Drawing.Size(1235, 614);
+            this.splitContainer1.SplitterDistance = 454;
             this.splitContainer1.TabIndex = 122;
             // 
             // splitContainer2
@@ -430,18 +430,9 @@ namespace eCTD_indexer
             this.splitContainer2.Panel2.Controls.Add(this.label11);
             this.splitContainer2.Panel2.Controls.Add(this.lStatus);
             this.splitContainer2.Panel2.Controls.Add(this.label9);
-            this.splitContainer2.Size = new System.Drawing.Size(181, 551);
+            this.splitContainer2.Size = new System.Drawing.Size(454, 551);
             this.splitContainer2.SplitterDistance = 510;
             this.splitContainer2.TabIndex = 125;
-            // 
-            // fileExplorerUserControl
-            // 
-            this.fileExplorerUserControl.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.fileExplorerUserControl.Location = new System.Drawing.Point(0, 0);
-            this.fileExplorerUserControl.Margin = new System.Windows.Forms.Padding(2);
-            this.fileExplorerUserControl.Name = "fileExplorerUserControl";
-            this.fileExplorerUserControl.Size = new System.Drawing.Size(181, 510);
-            this.fileExplorerUserControl.TabIndex = 123;
             // 
             // lFile
             // 
@@ -500,7 +491,7 @@ namespace eCTD_indexer
             this.toolStrip.Location = new System.Drawing.Point(0, 24);
             this.toolStrip.Name = "toolStrip";
             this.toolStrip.RenderMode = System.Windows.Forms.ToolStripRenderMode.Professional;
-            this.toolStrip.Size = new System.Drawing.Size(181, 39);
+            this.toolStrip.Size = new System.Drawing.Size(454, 39);
             this.toolStrip.Stretch = true;
             this.toolStrip.TabIndex = 122;
             this.toolStrip.Text = "toolStrip";
@@ -657,10 +648,9 @@ namespace eCTD_indexer
             this.menuStrip.Location = new System.Drawing.Point(0, 0);
             this.menuStrip.Name = "menuStrip";
             this.menuStrip.Padding = new System.Windows.Forms.Padding(3, 1, 0, 1);
-            this.menuStrip.Size = new System.Drawing.Size(181, 24);
+            this.menuStrip.Size = new System.Drawing.Size(454, 24);
             this.menuStrip.TabIndex = 124;
             this.menuStrip.Text = "menuStrip1";
-            this.menuStrip.MenuActivate += new System.EventHandler(this.menuStrip_MenuActivate);
             // 
             // fileToolStripMenuItem
             // 
@@ -677,35 +667,35 @@ namespace eCTD_indexer
             // newDossierToolStripMenuItem
             // 
             this.newDossierToolStripMenuItem.Name = "newDossierToolStripMenuItem";
-            this.newDossierToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            this.newDossierToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.newDossierToolStripMenuItem.Text = "New Dossier";
             this.newDossierToolStripMenuItem.Click += new System.EventHandler(this.newDossierToolStripMenuItem_Click);
             // 
             // openDossierToolStripMenuItem
             // 
             this.openDossierToolStripMenuItem.Name = "openDossierToolStripMenuItem";
-            this.openDossierToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            this.openDossierToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.openDossierToolStripMenuItem.Text = "Open Dossier";
             this.openDossierToolStripMenuItem.Click += new System.EventHandler(this.openDossierToolStripMenuItem_Click);
             // 
             // openLastDossierToolStripMenuItem
             // 
             this.openLastDossierToolStripMenuItem.Name = "openLastDossierToolStripMenuItem";
-            this.openLastDossierToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            this.openLastDossierToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.openLastDossierToolStripMenuItem.Text = "Open Last Dossier";
             this.openLastDossierToolStripMenuItem.Click += new System.EventHandler(this.openLastDossierToolStripMenuItem_Click);
             // 
             // tsbiCloseDossier
             // 
             this.tsbiCloseDossier.Name = "tsbiCloseDossier";
-            this.tsbiCloseDossier.Size = new System.Drawing.Size(168, 22);
+            this.tsbiCloseDossier.Size = new System.Drawing.Size(180, 22);
             this.tsbiCloseDossier.Text = "Close Dossier";
             this.tsbiCloseDossier.Click += new System.EventHandler(this.tsbiCloseDossier_Click);
             // 
             // closeToolStripMenuItem
             // 
             this.closeToolStripMenuItem.Name = "closeToolStripMenuItem";
-            this.closeToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            this.closeToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.closeToolStripMenuItem.Text = "Close Application";
             this.closeToolStripMenuItem.Click += new System.EventHandler(this.closeToolStripMenuItem_Click);
             // 
@@ -2256,11 +2246,21 @@ namespace eCTD_indexer
             this.checkBoxHU.UseVisualStyleBackColor = true;
             this.checkBoxHU.CheckedChanged += new System.EventHandler(this.checkBoxHU_CheckedChanged);
             // 
+            // fileExplorerUserControl
+            // 
+            this.fileExplorerUserControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.fileExplorerUserControl.Location = new System.Drawing.Point(0, 0);
+            this.fileExplorerUserControl.Margin = new System.Windows.Forms.Padding(2);
+            this.fileExplorerUserControl.Name = "fileExplorerUserControl";
+            this.fileExplorerUserControl.SeqPath = null;
+            this.fileExplorerUserControl.Size = new System.Drawing.Size(454, 510);
+            this.fileExplorerUserControl.TabIndex = 123;
+            // 
             // MainWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(962, 614);
+            this.ClientSize = new System.Drawing.Size(1235, 614);
             this.Controls.Add(this.splitContainer1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MainMenuStrip = this.menuStrip;

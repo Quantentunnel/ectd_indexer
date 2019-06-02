@@ -14,41 +14,42 @@ namespace eCTD_indexer.Database
         public DB_Access(String Path2Metadata)
         {
             // Store the connection string internally.
-            this.ConnectionString = "Data Source="+ Path2Metadata + "\\metadata.db";
+            this.ConnectionString = "Data Source=" + Path2Metadata + "\\metadata.db";
 
             // Load the connection string
             // see also https://stackoverflow.com/questions/10875612/sqlite-c-unable-to-open-the-database-file
             Connection = new SQLiteConnection(this.ConnectionString, true);
         }
 
-        public void setLifecycleStatus(String path, String file, String status)
+        public void setLifecycleStatus(LifecycleData lifedata)
         {
             using (SQLiteCommand comm = new SQLiteCommand())
             {
                 // Check if the file really exist
-                if (File.Exists(path + @"\" + file))
+                if (File.Exists(lifedata.Path + @"\" + lifedata.Filename))
                 {
-                    // Calculate the SHA-256 Hash value
-                    String sha256 = XML.SHA256.GetChecksum(path + @"\" + file);
-
                     // Check if the metadata of the file is stored in the DB
-                    DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + path + "' AND filename ='" + file + "'");
+                    DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + lifedata.Path + "' AND filename ='" + lifedata.Filename + "'");
 
                     // If yes, then update 
-                    if(dtInterimResult.Rows.Count == 1)
+                    if (dtInterimResult.Rows.Count == 1)
                     {
                         try
                         {
                             this.Connection.Open();
                             comm.Connection = this.Connection;
+
+                            // Create the SQLCommand by using a StringBuilder to get more performane rather than using a String-Object
                             StringBuilder SQLCommand = new StringBuilder("UPDATE ");
                             SQLCommand.Append("files");
                             SQLCommand.Append(" SET ");
                             SQLCommand.Append("lifecycle");
                             SQLCommand.Append("=\'");
-                            SQLCommand.Append(status);
-                            SQLCommand.Append("\' ");
-                            SQLCommand.Append("WHERE path='" + path + "' AND filename ='" + file + "'");
+                            SQLCommand.Append(lifedata.LifecycleAction);
+                            SQLCommand.Append("\' , sha256 =\'");
+                            SQLCommand.Append(lifedata.SHA256);
+                            SQLCommand.Append("\'");
+                            SQLCommand.Append(" WHERE path='" + lifedata.Path + "' AND filename ='" + lifedata.Filename + "'");
                             comm.CommandText = SQLCommand.ToString();
                             comm.ExecuteNonQuery();
                         }
@@ -63,26 +64,32 @@ namespace eCTD_indexer.Database
                     }
 
                     // If not, then insert the information into the database
-                    else if(dtInterimResult.Rows.Count == 0)
+                    else if (dtInterimResult.Rows.Count == 0)
                     {
                         comm.Connection = this.Connection;
-                        comm.CommandText = "INSERT INTO files (path,filename,sha256,lifecycle) VALUES (@path, @filename,@sha256,@lifecycle)";
+                        comm.CommandText = "INSERT INTO files (DID,FID,path,filename,sha256,lifecycle,seq,corresponding_prev_ID,corresponding_next_ID,virtual) VALUES (@DID, @FID, @path, @filename, @sha256, @lifecycle, @seq, @corresponding_prev_ID, @corresponding_next_ID, @virtual)";
 
                         try
                         {
                             this.Connection.Open();
 
-                            comm.Parameters.AddWithValue("@path", path);
-                            comm.Parameters.AddWithValue("@filename", file);
-                            comm.Parameters.AddWithValue("@sha256", sha256);
-                            comm.Parameters.AddWithValue("@lifecycle", status);
+                            comm.Parameters.AddWithValue("@DID", MainWindow.me.DossierID);
+                            comm.Parameters.AddWithValue("@FID", lifedata.ID);
+                            comm.Parameters.AddWithValue("@path", lifedata.Path);
+                            comm.Parameters.AddWithValue("@filename", lifedata.Filename);
+                            comm.Parameters.AddWithValue("@sha256", lifedata.SHA256);
+                            comm.Parameters.AddWithValue("@lifecycle", lifedata.LifecycleAction);
+                            comm.Parameters.AddWithValue("@seq", lifedata.Seq);
+                            comm.Parameters.AddWithValue("@corresponding_prev_ID", lifedata.Corresponding_prev_ID);
+                            comm.Parameters.AddWithValue("@corresponding_next_ID", lifedata.Corresponding_next_ID);
+                            comm.Parameters.AddWithValue("@virtual", Convert.ToInt32(lifedata.IsCorrespondingVirtual));
 
                             comm.ExecuteNonQuery();
                             comm.Parameters.Clear();
                         }
                         catch (SQLiteException)
                         {
-                            
+
                         }
                         finally
                         {
@@ -97,7 +104,7 @@ namespace eCTD_indexer.Database
                         throw new Exception();
                     }
 
-                    
+
                 }
                 // if the file not exist
                 else
@@ -107,16 +114,36 @@ namespace eCTD_indexer.Database
             }
         }
 
+        public LifecycleData getLifecycleStatus(String ID)
+        {
+            // Check if the metadata of the file is stored in the DB
+            DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where FID='" + ID + "'");
+            this.Connection.Close();
+
+            if (dtInterimResult.Rows.Count == 1)
+            {
+                LifecycleData lifecycle = new LifecycleData();
+
+
+                return lifecycle;
+            }
+            else
+            {
+                return null;
+            }
+            
+        }
+
         public String getFileStatus(String path, String file)
         {
             // Check if the metadata of the file is stored in the DB
             DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + path + "' AND filename ='" + file + "'");
             this.Connection.Close();
-            if (dtInterimResult.Rows.Count== 1)
+            if (dtInterimResult.Rows.Count == 1)
             {
-                return dtInterimResult.Rows[0][3].ToString();
+                return dtInterimResult.Rows[0][5].ToString();
             }
-            else if(dtInterimResult.Rows.Count == 0)
+            else if (dtInterimResult.Rows.Count == 0)
             {
                 return "Not yet defined";
             }
@@ -124,7 +151,6 @@ namespace eCTD_indexer.Database
             {
                 return "N/A";
             }
-            
         }
 
         private DataTable ExecuteSelectSQLCommand(String Select, String Table, String Where)
@@ -153,7 +179,7 @@ namespace eCTD_indexer.Database
         /*
         * Variables
         */
-            // DB Access
+        // DB Access
         internal SQLiteConnection Connection;
         private String ConnectionString;
 
@@ -164,5 +190,32 @@ namespace eCTD_indexer.Database
 
         // List of Tables
         private List<String> ListOfTables = new List<String>();
+    }
+
+    public class LifecycleData
+    {
+        public LifecycleData()
+        {
+            ID = "-1";
+            Path = "-1";
+            Filename = "-1";
+            SHA256 = "-1";
+            LifecycleAction = "New";
+            Seq = "-1";
+            Corresponding_prev_ID = "-1";
+            Corresponding_next_ID = "-1";
+            IsCorrespondingVirtual = false;
+        }
+
+        public String ID { get; set; }
+        public String Path { get; set; }
+        public String Filename { get; set; }
+        public String SHA256 { get; set; }
+        public String LifecycleAction { get; set; }
+        public String Seq { get; set; }
+        public String Corresponding_prev_ID { get; set; }
+        public String Corresponding_next_ID { get; set; }
+        public bool IsCorrespondingVirtual { get; set; }
+    
     }
 }
