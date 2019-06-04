@@ -58,5 +58,17 @@ namespace eCTD_indexer.Properties {
                 this["LastDossier"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("i")]
+        public string FirstIDCharacter {
+            get {
+                return ((string)(this["FirstIDCharacter"]));
+            }
+            set {
+                this["FirstIDCharacter"] = value;
+            }
+        }
     }
 }

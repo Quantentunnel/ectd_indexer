@@ -51,9 +51,6 @@ namespace eCTD_indexer.XML
             bool m1responsesopen = false;
             bool m1additionalopen = false;
 
-            //integer counter for id values
-            int idcounter = 0;
-
             //title of elements under Module 1.2, changes to use the path between "form-" and ".pdf" of path if the path contains "form-"
             string formTitle = "Application form";
 
@@ -101,8 +98,8 @@ namespace eCTD_indexer.XML
             }
             Array.Sort(filenameSortArray);
 
-            string[,] filenameListArray;
-            filenameListArray = new string[m1FileNumber, 5];
+            // Lifecycle Array
+            Database.LifecycleData[] lifecycleArray = new Database.LifecycleData[m1FileNumber];
 
             int counterX = 0;
 
@@ -114,11 +111,11 @@ namespace eCTD_indexer.XML
                 string shortname = name.Substring(index + 6);
                 shortname = shortname.Replace("\\", "/");
                 MD5Calculator checksum = new MD5Calculator();
-                string sum = checksum.ComputeMD5Checksum(f.FullName);
-                string modifiedFileID = "";
+                String sum = checksum.ComputeMD5Checksum(f.FullName);
+                String modifiedFileID = "";
 
                 // Standard operation
-                string operation = "new";
+                String operation = "new";
 
                 #region Lifecycle operations, replace, append and delete
                 if (dba != null)
@@ -139,11 +136,22 @@ namespace eCTD_indexer.XML
                 } 
                 #endregion
 
-                filenameListArray[counterX, 0] = name;
-                filenameListArray[counterX, 1] = shortname;
-                filenameListArray[counterX, 2] = sum;
-                filenameListArray[counterX, 3] = operation;
-                filenameListArray[counterX, 4] = modifiedFileID;
+                // Information to generate the xml file
+                Database.LifecycleData lifecycle = new Database.LifecycleData();
+                lifecycle.Fullname = name;
+                lifecycle.Shortname = shortname;
+                lifecycle.MD5 = sum;
+                lifecycle.LifecycleAction = operation;
+                lifecycle.ModifiedTag = modifiedFileID;
+                lifecycle.Seq = MainWindow.me.SeqNumber;
+                lifecycle.DID = MainWindow.me.DossierID;
+// TODO: Missing Path and File. So the information is not stored in the DB yet.
+                lifecycle.ID = Properties.Settings.Default.FirstIDCharacter + dba.GetFileID(lifecycle, true);
+
+                // Add the information to the array
+                lifecycleArray[counterX] = lifecycle;
+
+                // Count +1
                 counterX++;
             }
 
@@ -202,29 +210,29 @@ namespace eCTD_indexer.XML
 
                         sr.WriteLine("  </eu-envelope>");
 
-                        // start of EU Module 1
+                        // Start of EU Module 1
                         sr.WriteLine("  <m1-eu>");
-                        //leaf generator
+                        // Leaf generator
                         for (int p = 0; p < m1FileNumber; p++)
                         {
-                            List<string> filePathList = new List<string>(filenameListArray[p, 0].Split(Path.DirectorySeparatorChar));
-                            if (filenameListArray[p, 0].Contains("10-cover") && m10open == false)
+                            List<string> filePathList = new List<string>(lifecycleArray[p].Fullname.Split(Path.DirectorySeparatorChar));
+                            if (lifecycleArray[p].Fullname.Contains("10-cover") && m10open == false)
                             {
                                 sr.WriteLine("      <m1-0-cover>");
                                 m10open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("10-cover"))
+                            if (lifecycleArray[p].Fullname.Contains("10-cover"))
                             {
-                                if (filenameListArray[p, 0].Contains("common")) envelope.country = "common";
+                                if (lifecycleArray[p].Fullname.Contains("common")) envelope.country = "common";
                                 else envelope.country = filePathList[filePathList.IndexOf("10-cover") + 1];
 
                                 sr.WriteLine("          <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("              <leaf ID=\"m10-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
-                                if (filenameListArray[p, 0].Contains("-tracking"))
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
+                                if (lifecycleArray[p].Fullname.Contains("-tracking"))
                                 {
                                     sr.WriteLine("                  <title>Tracking table</title>");
                                 }
@@ -234,553 +242,532 @@ namespace eCTD_indexer.XML
                                 }
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("10-cover") == false && m10open == true)
+                            if (lifecycleArray[p].Fullname.Contains("10-cover") == false && m10open == true)
                             {
                                 sr.WriteLine("      </m1-0-cover>");
                                 m10open = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("12-form") && m12open == false)
+                            if (lifecycleArray[p].Fullname.Contains("12-form") && m12open == false)
                             {
                                 sr.WriteLine("      <m1-2-form>");
                                 m12open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("12-form"))
+                            if (lifecycleArray[p].Fullname.Contains("12-form"))
                             {
-                                if (filenameListArray[p, 0].Contains("common")) envelope.appCountry = "common";
+                                if (lifecycleArray[p].Fullname.Contains("common")) envelope.appCountry = "common";
                                 else envelope.appCountry = filePathList[filePathList.IndexOf("12-form") + 1];
-                                if (filenameListArray[p, 0].Contains("form-"))
+                                if (lifecycleArray[p].Fullname.Contains("form-"))
                                 {
-                                    int formNameStart = filenameListArray[p, 0].IndexOf("form-") + 5;
+                                    int formNameStart = lifecycleArray[p].Fullname.IndexOf("form-") + 5;
 
                                     // Using LastIndexOf instead of IndexOf because an Exception is thrown
                                     // if for instance a user name contains a dot.
-                                    int formNameLength = (filenameListArray[p, 0].LastIndexOf(".") - formNameStart);
-                                    formTitle = ("Application - " + filenameListArray[p, 0].Substring(formNameStart, formNameLength));
+                                    int formNameLength = (lifecycleArray[p].Fullname.LastIndexOf(".") - formNameStart);
+                                    formTitle = ("Application - " + lifecycleArray[p].Fullname.Substring(formNameStart, formNameLength));
                                 }
                                 else formTitle = "Application form";
                                 sr.WriteLine("          <specific country=\"{0}\">", envelope.appCountry);
-                                sr.WriteLine("              <leaf ID=\"m12-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>{0}</title>", formTitle);
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("12-form") == false && m12open == true)
+                            if (lifecycleArray[p].Fullname.Contains("12-form") == false && m12open == true)
                             {
                                 sr.WriteLine("      </m1-2-form>");
                                 m12open = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("13-pi") && m13open == false)
+                            if (lifecycleArray[p].Fullname.Contains("13-pi") && m13open == false)
                             {
                                 sr.WriteLine("      <m1-3-pi>");
                                 m13open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("131-spclabelpl") && m131spcopen == false)
+                            if (lifecycleArray[p].Fullname.Contains("131-spclabelpl") && m131spcopen == false)
                             {
                                 sr.WriteLine("          <m1-3-1-spc-label-pl>");
                                 m131spcopen = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("131-spclabelpl"))
+                            if (lifecycleArray[p].Fullname.Contains("131-spclabelpl"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("131-spclabelpl") + 1];
                                 envelope.language = filePathList[filePathList.IndexOf("131-spclabelpl") + 1];
 
-                                if (filenameListArray[p, 0].Contains("-spc.") || filenameListArray[p, 0].Contains("-spc-")) envelope.m131identifier = "spc";
-                                if (filenameListArray[p, 0].Contains("-annex2")) envelope.m131identifier = "annex2";
-                                if (filenameListArray[p, 0].Contains("-outer")) envelope.m131identifier = "outer";
-                                if (filenameListArray[p, 0].Contains("-interpack")) envelope.m131identifier = "interpack";
-                                if (filenameListArray[p, 0].Contains("-impack")) envelope.m131identifier = "impack";
-                                if (filenameListArray[p, 0].Contains("-other")) envelope.m131identifier = "other";
-                                if (filenameListArray[p, 0].Contains("-pl")) envelope.m131identifier = "pl";
+                                if (lifecycleArray[p].Fullname.Contains("-spc.") || lifecycleArray[p].Fullname.Contains("-spc-")) envelope.m131identifier = "spc";
+                                if (lifecycleArray[p].Fullname.Contains("-annex2")) envelope.m131identifier = "annex2";
+                                if (lifecycleArray[p].Fullname.Contains("-outer")) envelope.m131identifier = "outer";
+                                if (lifecycleArray[p].Fullname.Contains("-interpack")) envelope.m131identifier = "interpack";
+                                if (lifecycleArray[p].Fullname.Contains("-impack")) envelope.m131identifier = "impack";
+                                if (lifecycleArray[p].Fullname.Contains("-other")) envelope.m131identifier = "other";
+                                if (lifecycleArray[p].Fullname.Contains("-pl")) envelope.m131identifier = "pl";
                                 sr.WriteLine("              <pi-doc type=\"{0}\" xml:lang=\"{1}\" country=\"{2}\">", envelope.m131identifier, envelope.language, envelope.country);
-                                sr.WriteLine("                  <leaf ID=\"m131-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                      checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                      modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                      xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("                  <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                      checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                      modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                      xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                      <title>{0}</title>", envelope.m131identifier);
                                 sr.WriteLine("                  </leaf>");
                                 sr.WriteLine("              </pi-doc>");
-                                idcounter++;
                                 envelope.m131identifier = "";
                             }
                             
-                            if (filenameListArray[p, 0].Contains("131-spclabelpl") == false && m131spcopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("131-spclabelpl") == false && m131spcopen == true)
                             {
                                 sr.WriteLine("          </m1-3-1-spc-label-pl>");
                                 m131spcopen = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("132-mockup") && m132open == false)
+                            if (lifecycleArray[p].Fullname.Contains("132-mockup") && m132open == false)
                             {
                                 sr.WriteLine("          <m1-3-2-mockup>");
                                 m132open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("132-mockup"))
+                            if (lifecycleArray[p].Fullname.Contains("132-mockup"))
                             {
-                                int mockupNameFinder = filenameListArray[p, 0].IndexOf("mockup-") + 7;
-                                int mockupNameLength = (filenameListArray[p, 0].Length - mockupNameFinder) - 4;
-                                string mockupTitle = filenameListArray[p, 0].Substring(mockupNameFinder, mockupNameLength);
+                                int mockupNameFinder = lifecycleArray[p].Fullname.IndexOf("mockup-") + 7;
+                                int mockupNameLength = (lifecycleArray[p].Fullname.Length - mockupNameFinder) - 4;
+                                string mockupTitle = lifecycleArray[p].Fullname.Substring(mockupNameFinder, mockupNameLength);
                                 envelope.country = filePathList[filePathList.IndexOf("132-mockup") + 1];
 
                                 sr.WriteLine("              <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("                  <leaf ID=\"m132-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                      checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                      modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                      xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("                  <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                      checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                      modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                      xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                      <title>Mock-up {0}</title>", mockupTitle);
                                 sr.WriteLine("                  </leaf>");
                                 sr.WriteLine("              </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("132-mockup") == false && m132open == true)
+                            if (lifecycleArray[p].Fullname.Contains("132-mockup") == false && m132open == true)
                             {
                                 sr.WriteLine("          </m1-3-2-mockup>");
                                 m132open = false;
-                                idcounter = 0;
                             }
                             
 
-                            if (filenameListArray[p, 0].Contains("133-specimen") && m133open == false)
+                            if (lifecycleArray[p].Fullname.Contains("133-specimen") && m133open == false)
                             {
                                 sr.WriteLine("          <m1-3-3-specimen>");
                                 m133open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("133-specimen"))
+                            if (lifecycleArray[p].Fullname.Contains("133-specimen"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("133-specimen") + 1];
 
                                 sr.WriteLine("            <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("                  <leaf ID=\"m133-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                      checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                      modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                      xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("                  <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                      checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                      modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                      xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                      <title>Specimen</title>");
                                 sr.WriteLine("                  </leaf>");
                                 sr.WriteLine("              </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("133-specimen") == false && m133open == true)
+                            if (lifecycleArray[p].Fullname.Contains("133-specimen") == false && m133open == true)
                             {
                                 sr.WriteLine("          </m1-3-3-specimen>");
                                 m133open = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("134-consultation") && m134open == false)
+                            if (lifecycleArray[p].Fullname.Contains("134-consultation") && m134open == false)
                             {
                                 sr.WriteLine("          <m1-3-4-consultation>");
                                 m134open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("134-consultation"))
+                            if (lifecycleArray[p].Fullname.Contains("134-consultation"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("134-consultation") + 1];
 
                                 sr.WriteLine("            <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("                <leaf ID=\"m134-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                    <title>Consultation with Target Patient Groups</title>");
                                 sr.WriteLine("                </leaf>");
                                 sr.WriteLine("            </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("134-consultation") == false && m134open == true)
+                            if (lifecycleArray[p].Fullname.Contains("134-consultation") == false && m134open == true)
                             {
                                 sr.WriteLine("          </m1-3-4-consultation>");
                                 m134open = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("135-approved") && m135open == false)
+                            if (lifecycleArray[p].Fullname.Contains("135-approved") && m135open == false)
                             {
                                 sr.WriteLine("          <m1-3-5-approved>");
                                 m135open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("135-approved"))
+                            if (lifecycleArray[p].Fullname.Contains("135-approved"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("135-approved") + 1];
 
                                 sr.WriteLine("            <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("                  <leaf ID=\"m135-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                      checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                      modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                      xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("                  <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                      checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                      modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                      xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                      <title>Product Information already approved in the Member States</title>");
                                 sr.WriteLine("                  </leaf>");
                                 sr.WriteLine("              </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("135-approved") == false && m135open == true)
+                            if (lifecycleArray[p].Fullname.Contains("135-approved") == false && m135open == true)
                             {
                                 sr.WriteLine("          </m1-3-5-approved>");
                                 m135open = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("136-braille"))
+                            if (lifecycleArray[p].Fullname.Contains("136-braille"))
                             {
                                 sr.WriteLine("          <m1-3-6-braille>");
-                                sr.WriteLine("              <leaf ID=\"m136\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Braille</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-3-6-braille>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("13-pi") == false && m13open == true)
+                            if (lifecycleArray[p].Fullname.Contains("13-pi") == false && m13open == true)
                             {
                                 sr.WriteLine("      </m1-3-pi>");
                                 m13open = false;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("14-expert") && m14open == false)
+                            if (lifecycleArray[p].Fullname.Contains("14-expert") && m14open == false)
                             {
                                 sr.WriteLine("      <m1-4-expert>");
                                 m14open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("141-quality"))
+                            if (lifecycleArray[p].Fullname.Contains("141-quality"))
                             {
                                 sr.WriteLine("          <m1-4-1-quality>");
-                                sr.WriteLine("              <leaf ID=\"m141\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Quality</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-4-1-quality>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("142-nonclinical"))
+                            if (lifecycleArray[p].Fullname.Contains("142-nonclinical"))
                             {
                                 sr.WriteLine("          <m1-4-2-non-clinical>");
-                                sr.WriteLine("              <leaf ID=\"m142\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("             <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Non-Clinical</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-4-2-non-clinical>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("143-clinical"))
+                            if (lifecycleArray[p].Fullname.Contains("143-clinical"))
                             {
                                 sr.WriteLine("          <m1-4-3-clinical>");
-                                sr.WriteLine("              <leaf ID=\"m143\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Clinical</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-4-3-clinical>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("14-expert") == false && m14open == true)
+                            if (lifecycleArray[p].Fullname.Contains("14-expert") == false && m14open == true)
                             {
                                 sr.WriteLine("      </m1-4-expert>");
                                 m14open = false;
                             }
 
                             
-                            if (filenameListArray[p, 0].Contains("15-specific") && m15open == false)
+                            if (lifecycleArray[p].Fullname.Contains("15-specific") && m15open == false)
                             {
                                 sr.WriteLine("      <m1-5-specific>");
                                 m15open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("151-bibliographic"))
+                            if (lifecycleArray[p].Fullname.Contains("151-bibliographic"))
                             {
                                 sr.WriteLine("          <m1-5-1-bibliographic>");
-                                sr.WriteLine("              <leaf ID=\"m151\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("             <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Information for Bibliographical Applications</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-5-1-bibliographic>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("152-generic-hybrid-bio-similar"))
+                            if (lifecycleArray[p].Fullname.Contains("152-generic-hybrid-bio-similar"))
                             {
                                 sr.WriteLine("          <m1-5-2-generic-hybrid-bio-similar>");
-                                sr.WriteLine("              <leaf ID=\"m152\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Information for Generic, �Hybrid� or Bio-similar Applications</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-5-2-generic-hybrid-bio-similar>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("153-data-market-exclusivity"))
+                            if (lifecycleArray[p].Fullname.Contains("153-data-market-exclusivity"))
                             {
                                 sr.WriteLine("          <m1-5-3-data-market-exclusivity>");
-                                sr.WriteLine("              <leaf ID=\"m153\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>(Extended) Data/Market Exclusivity</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-5-3-data-market-exclusivity>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("154-exceptional"))
+                            if (lifecycleArray[p].Fullname.Contains("154-exceptional"))
                             {
                                 sr.WriteLine("          <m1-5-4-exceptional-circumstances>");
-                                sr.WriteLine("              <leaf ID=\"m154\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Exceptional Circumstances</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-5-4-exceptional-circumstances>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("155-conditional-ma"))
+                            if (lifecycleArray[p].Fullname.Contains("155-conditional-ma"))
                             {
                                 sr.WriteLine("          <m1-5-5-conditional-ma>");
-                                sr.WriteLine("              <leaf ID=\"m155\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Conditional Marketing Authorisation</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-5-5-conditional-ma>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("15-specific") == false && m15open == true)
+                            if (lifecycleArray[p].Fullname.Contains("15-specific") == false && m15open == true)
                             {
                                 sr.WriteLine("      </m1-5-specific>");
                                 m15open = false;
                             }
 
                             
-                            if (filenameListArray[p, 0].Contains("16-environrisk") && m16open == false)
+                            if (lifecycleArray[p].Fullname.Contains("16-environrisk") && m16open == false)
                             {
                                 sr.WriteLine("      <m1-6-environrisk>");
                                 m16open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("161-nongmo"))
+                            if (lifecycleArray[p].Fullname.Contains("161-nongmo"))
                             {
                                 sr.WriteLine("          <m1-6-1-non-gmo>");
-                                sr.WriteLine("              <leaf ID=\"m161nongmo\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Non-GMO</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-6-1-non-gmo>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("162-gmo"))
+                            if (lifecycleArray[p].Fullname.Contains("162-gmo"))
                             {
                                 sr.WriteLine("          <m1-6-2-gmo>");
-                                sr.WriteLine("              <leaf ID=\"m161gmo\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>GMO</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-6-2-gmo>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("16-environrisk") == false && m16open == true)
+                            if (lifecycleArray[p].Fullname.Contains("16-environrisk") == false && m16open == true)
                             {
                                 sr.WriteLine("      </m1-6-environrisk>");
                                 m16open = false;
                             }
 
                             
-                            if (filenameListArray[p, 0].Contains("17-orphan") && m17open == false)
+                            if (lifecycleArray[p].Fullname.Contains("17-orphan") && m17open == false)
                             {
                                 sr.WriteLine("      <m1-7-orphan>");
                                 m17open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("171-similarity"))
+                            if (lifecycleArray[p].Fullname.Contains("171-similarity"))
                             {
                                 sr.WriteLine("          <m1-7-1-similarity>");
-                                sr.WriteLine("              <leaf ID=\"m171\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Similarity</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-7-1-similarity>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("172-market-exclusivity"))
+                            if (lifecycleArray[p].Fullname.Contains("172-market-exclusivity"))
                             {
                                 sr.WriteLine("          <m1-7-2-market-exclusivity>");
-                                sr.WriteLine("              <leaf ID=\"m172\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Market Exclusivity</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-7-2-market-exclusivity>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("17-orphan") == false && m17open == true)
+                            if (lifecycleArray[p].Fullname.Contains("17-orphan") == false && m17open == true)
                             {
                                 sr.WriteLine("      </m1-7-orphan>");
                                 m17open = false;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("18-pharmacovigilance") && m18open == false)
+                            if (lifecycleArray[p].Fullname.Contains("18-pharmacovigilance") && m18open == false)
                             {
                                 sr.WriteLine("      <m1-8-pharmacovigilance>");
                                 m18open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("181-phvig-system") && m181open == false)
+                            if (lifecycleArray[p].Fullname.Contains("181-phvig-system") && m181open == false)
                             {
                                 sr.WriteLine("          <m1-8-1-pharmacovigilance-system>");
                                 m181open = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("181-phvig-system"))
+                            if (lifecycleArray[p].Fullname.Contains("181-phvig-system"))
                             {
-                                sr.WriteLine("              <leaf ID=\"m18-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Pharmacovigilance System</title>");
                                 sr.WriteLine("              </leaf>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("181-phvig-system") == false && m181open == true)
+                            if (lifecycleArray[p].Fullname.Contains("181-phvig-system") == false && m181open == true)
                             {
                                 sr.WriteLine("          </m1-8-1-pharmacovigilance-system>");
                                 m181open = false;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("182-riskmgt-system"))
+                            if (lifecycleArray[p].Fullname.Contains("182-riskmgt-system"))
                             {
                                 sr.WriteLine("          <m1-8-2-risk-management-system>");
-                                sr.WriteLine("              <leaf ID=\"m18-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Risk-management System</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </m1-8-2-risk-management-system>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("18-pharmacovigilance") == false && m18open == true)
+                            if (lifecycleArray[p].Fullname.Contains("18-pharmacovigilance") == false && m18open == true)
                             {
                                 sr.WriteLine("      </m1-8-pharmacovigilance>");
                                 m18open = false;
-                                idcounter = 0;
                             }
                            
-                            if (filenameListArray[p, 0].Contains("19-clinical-trials"))
+                            if (lifecycleArray[p].Fullname.Contains("19-clinical-trials"))
                             {
                                 sr.WriteLine("      <m1-9-clinical-trials>");
-                                sr.WriteLine("          <leaf ID=\"m19\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("              checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("              modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("              xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("          <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("              checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("              modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("              xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("              <title>Information relating to Clinical Trials</title>");
                                 sr.WriteLine("          </leaf>");
                                 sr.WriteLine("      </m1-9-clinical-trials>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("110-paediatrics"))
+                            if (lifecycleArray[p].Fullname.Contains("110-paediatrics"))
                             {
                                 sr.WriteLine("      <m1-10-paediatrics>");
-                                sr.WriteLine("          <leaf ID=\"m110\" operation=\"{0}\" checksum-type=\"md5\"", filenameListArray[p, 3]);
-                                sr.WriteLine("              checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("              modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("              xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("          <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("              checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("              modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("              xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("              <title>Information relating to Paediatrics</title>");
                                 sr.WriteLine("          </leaf>");
                                 sr.WriteLine("      </m1-10-paediatrics>");
                             }
                             
-                            if (filenameListArray[p, 0].Contains("additional-data") && m1additionalopen == false)
+                            if (lifecycleArray[p].Fullname.Contains("additional-data") && m1additionalopen == false)
                             {
                                 sr.WriteLine("      <m1-additional-data>");
                                 m1additionalopen = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("additional-data"))
+                            if (lifecycleArray[p].Fullname.Contains("additional-data"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("additional-data") + 1];
 
                                 sr.WriteLine("          <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("              <leaf ID=\"m1add-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Additional Data</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("additional-data") == false && m1additionalopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("additional-data") == false && m1additionalopen == true)
                             {
                                 sr.WriteLine("      </m1-additional-data>");
                                 m1additionalopen = false;
-                                idcounter = 0;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("eu" + Path.DirectorySeparatorChar + "responses") && m1responsesopen == false)
+                            if (lifecycleArray[p].Fullname.Contains("eu" + Path.DirectorySeparatorChar + "responses") && m1responsesopen == false)
                             {
                                 sr.WriteLine("      <m1-responses>");
                                 m1responsesopen = true;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("eu" + Path.DirectorySeparatorChar + "responses"))
+                            if (lifecycleArray[p].Fullname.Contains("eu" + Path.DirectorySeparatorChar + "responses"))
                             {
                                 envelope.country = filePathList[filePathList.IndexOf("responses") + 1];
 
                                 sr.WriteLine("          <specific country=\"{0}\">", envelope.country);
-                                sr.WriteLine("              <leaf ID=\"m1res-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                sr.WriteLine("                  checksum=\"{0}\"", filenameListArray[p, 2]);
-                                sr.WriteLine("                  modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                sr.WriteLine("                  xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                sr.WriteLine("              <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                sr.WriteLine("                  checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                sr.WriteLine("                  modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                sr.WriteLine("                  xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 sr.WriteLine("                  <title>Responses to Questions</title>");
                                 sr.WriteLine("              </leaf>");
                                 sr.WriteLine("          </specific>");
-                                idcounter++;
                             }
                             
-                            if (filenameListArray[p, 0].Contains("eu" + Path.DirectorySeparatorChar + "responses") == false && m1responsesopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("eu" + Path.DirectorySeparatorChar + "responses") == false && m1responsesopen == true)
                             {
                                 sr.WriteLine("      </m1-responses>");
                                 m1responsesopen = false;
-                                idcounter = 0;
                             }
                         }
 
@@ -995,9 +982,6 @@ namespace eCTD_indexer.XML
             string indication1 = "";
             #endregion
 
-            //integer counter for id values
-            int idcounter = 0;
-
             //count files in sequence to determine max. number of unindexed files
             int totalFileNumber = files.Count(sequencePath);
 
@@ -1054,8 +1038,8 @@ namespace eCTD_indexer.XML
             }
             Array.Sort(filenameSortArray);
 
-            string[,] filenameListArray;
-            filenameListArray = new string[totalFileNumber, 5];
+            // Lifecycle Array
+            Database.LifecycleData[] lifecycleArray = new Database.LifecycleData[totalFileNumber];
 
             int counterX = 0;
 
@@ -1090,11 +1074,20 @@ namespace eCTD_indexer.XML
                 }
                 #endregion
 
-                filenameListArray[counterX, 0] = name;
-                filenameListArray[counterX, 1] = shortname;
-                filenameListArray[counterX, 2] = sum;
-                filenameListArray[counterX, 3] = operation;
-                filenameListArray[counterX, 4] = modifiedFileID;
+
+                // Information to generate the xml file
+                Database.LifecycleData lifecycle = new Database.LifecycleData();
+                lifecycle.Fullname = name;
+                lifecycle.Shortname = shortname;
+                lifecycle.MD5 = sum;
+                lifecycle.LifecycleAction = operation;
+                lifecycle.ModifiedTag = modifiedFileID;
+                lifecycle.Seq = MainWindow.me.SeqNumber;
+                lifecycle.DID = MainWindow.me.DossierID;
+                lifecycle.ID = Properties.Settings.Default.FirstIDCharacter + dba.GetFileID(lifecycle, true);
+
+                // Add the information to the array
+                lifecycleArray[counterX] = lifecycle;
                 counterX++;
             }
 
@@ -1118,13 +1111,13 @@ namespace eCTD_indexer.XML
                         for (int p = 0; p < totalFileNumber; p++)
                         {
                             //Module 1
-                            if (filenameListArray[p, 0].Contains("eu-regional.xml"))
+                            if (lifecycleArray[p].Fullname.Contains("eu-regional.xml"))
                             {
                                 swr.WriteLine("    <m1-administrative-information-and-prescribing-information>");
-                                swr.WriteLine("        <leaf ID=\"m1-{0}\" operation=\"new\" checksum-type=\"md5\"", idcounter);
-                                swr.WriteLine("            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("            modified-file=\"{0}\"", filenameListArray[p, 4]); ;
-                                swr.WriteLine("            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("        <leaf ID=\"{0}\" operation=\"new\" checksum-type=\"md5\"", lifecycleArray[p].ID);
+                                swr.WriteLine("            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag); ;
+                                swr.WriteLine("            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("            <title>EU Regional Module 1</title>");
                                 swr.WriteLine("        </leaf>");
                                 swr.WriteLine("    </m1-administrative-information-and-prescribing-information>");
@@ -1132,103 +1125,103 @@ namespace eCTD_indexer.XML
                             }
 
                             //Module 2
-                            if (filenameListArray[p, 0].Contains("m2" + Path.DirectorySeparatorChar) && m2open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m2" + Path.DirectorySeparatorChar) && m2open == false)
                             {
                                 swr.WriteLine("    <m2-common-technical-document-summaries>");
                                 m2open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m2" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains("m2" + Path.DirectorySeparatorChar + "2") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m2" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains("m2" + Path.DirectorySeparatorChar + "2") == false)
                             {
-                                swr.WriteLine("        <leaf ID=\"m2-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("            modified-file=\"{0}\"", filenameListArray[p, 4]); ;
-                                swr.WriteLine("            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag); ;
+                                swr.WriteLine("            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("            <title>Cover Letter</title>");
                                 swr.WriteLine("        </leaf>");
-                                idcounter++;
+                                
                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "22-intro") && m22open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "22-intro") && m22open == false)
                             {
                                 swr.WriteLine("        <m2-2-introduction>");
                                 m22open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "22-intro"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "22-intro"))
                             {
-                                swr.WriteLine("            <leaf ID=\"m22-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                <title>Introduction</title>");
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "22-intro") == false && m22open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "22-intro") == false && m22open == true)
                             {
                                 swr.WriteLine("        </m2-2-introduction>");
                                 m22open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos") && m23open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos") && m23open == false)
                             {
                                 swr.WriteLine("        <m2-3-quality-overall-summary>");
                                 m23open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos")
-                                && filenameListArray[p, 0].Contains("introduction") == false
-                                && filenameListArray[p, 0].Contains("drug-substance") == false
-                                && filenameListArray[p, 0].Contains("drug-product") == false
-                                && filenameListArray[p, 0].Contains("appendices") == false
-                                && filenameListArray[p, 0].Contains("regional-information") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos")
+                                && lifecycleArray[p].Fullname.Contains("introduction") == false
+                                && lifecycleArray[p].Fullname.Contains("drug-substance") == false
+                                && lifecycleArray[p].Fullname.Contains("drug-product") == false
+                                && lifecycleArray[p].Fullname.Contains("appendices") == false
+                                && lifecycleArray[p].Fullname.Contains("regional-information") == false)
                             {
-                                swr.WriteLine("            <leaf ID=\"m23-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                <title>Quality Overall Summary</title>");
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos") && filenameListArray[p, 0].Contains("appendices"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos") && lifecycleArray[p].Fullname.Contains("appendices"))
                             {
                                 swr.WriteLine("            <m2-3-a-appendices>");
-                                swr.WriteLine("                <leaf ID=\"m23a-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>Appendices</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-3-a-appendices>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product") && m23popen == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product") && m23popen == false)
                             {
                                 swr.WriteLine("            <m2-3-p-drug-product>");
                                 m23popen = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product"))
                             {
-                                swr.WriteLine("                <leaf ID=\"m23p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>Drug Product</title>");
                                 swr.WriteLine("                 </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product") == false && m23popen == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-product") == false && m23popen == true)
                             {
                                 swr.WriteLine("            </m2-3-p-drug-product>");
                                 m23popen = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance"))
                             {
-                                if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance.pdf") == false && filenameListArray[p, 0].Contains("-manufacturer-"))
+                                if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance.pdf") == false && lifecycleArray[p].Fullname.Contains("-manufacturer-"))
                                 {
-                                    apiIndex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance-");
-                                    manufacturerIndex = filenameListArray[p, 0].IndexOf("-manufacturer-");
-                                    api = filenameListArray[p, 0].Substring(apiIndex + 23, (manufacturerIndex - (apiIndex + 23)));
-                                    manufacturer = filenameListArray[p, 0].Substring(manufacturerIndex + 14, filenameListArray[p, 0].Length - (manufacturerIndex + 14 + 4));
+                                    apiIndex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "23-qos" + Path.DirectorySeparatorChar + "drug-substance-");
+                                    manufacturerIndex = lifecycleArray[p].Fullname.IndexOf("-manufacturer-");
+                                    api = lifecycleArray[p].Fullname.Substring(apiIndex + 23, (manufacturerIndex - (apiIndex + 23)));
+                                    manufacturer = lifecycleArray[p].Fullname.Substring(manufacturerIndex + 14, lifecycleArray[p].Fullname.Length - (manufacturerIndex + 14 + 4));
                                 }
                                 else
                                 {
@@ -1237,416 +1230,415 @@ namespace eCTD_indexer.XML
                                 }
 
                                 swr.WriteLine("            <m2-3-s-drug-substance substance=\"{0}\" manufacturer=\"{1}\">", api, manufacturer);
-                                swr.WriteLine("                <leaf ID=\"m23s-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>Drug Substance</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-3-s-drug-substance>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos") && filenameListArray[p, 0].Contains("introduction"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos") && lifecycleArray[p].Fullname.Contains("introduction"))
                             {
                                 swr.WriteLine("            <m2-3-introduction>");
-                                swr.WriteLine("                <leaf ID=\"m23i-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>Introduction</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-3-introduction>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos") && filenameListArray[p, 0].Contains("regional-information"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos") && lifecycleArray[p].Fullname.Contains("regional-information"))
                             {
                                 swr.WriteLine("            <m2-3-r-regional-information>");
-                                swr.WriteLine("                <leaf ID=\"m23r-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>Regional information</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-3-r-regional-information>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "23-qos") == false && m23open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "23-qos") == false && m23open == true)
                             {
                                 swr.WriteLine("        </m2-3-quality-overall-summary>");
                                 m23open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "24-nonclin-over") && m24open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "24-nonclin-over") && m24open == false)
                             {
                                 swr.WriteLine("        <m2-4-nonclinical-overview>");
                                 m24open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "24-nonclin-over"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "24-nonclin-over"))
                             {
-                                swr.WriteLine("            <leaf ID=\"m24-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                <title>2.4 Nonclinical Overview</title>");
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "24-nonclin-over") == false && m24open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "24-nonclin-over") == false && m24open == true)
                             {
                                 swr.WriteLine("        </m2-4-nonclinical-overview>");
                                 m24open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "25-clin-over") && m25open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "25-clin-over") && m25open == false)
                             {
                                 swr.WriteLine("        <m2-5-clinical-overview>");
                                 m25open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "25-clin-over"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "25-clin-over"))
                             {
-                                swr.WriteLine("            <leaf ID=\"m25-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                <title>2.5 Clinical Overview</title>");
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "25-clin-over") == false && m25open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "25-clin-over") == false && m25open == true)
                             {
                                 swr.WriteLine("        </m2-5-clinical-overview>");
                                 m25open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == true && m26open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == true && m26open == false)
                             {
                                 swr.WriteLine("        <m2-6-nonclinical-written-and-tabulated-summaries>");
                                 m26open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == true
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "introduction") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-written-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-tabulated-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-written-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-tabulated-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-written-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-tabulated-summary") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == true
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "introduction") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-written-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-tabulated-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-written-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-tabulated-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-written-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-tabulated-summary") == false)
                             {
-                                swr.WriteLine("            <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                <title>2.6 Nonclinical Written and Tabulated Summaries</title>");
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "introduction") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "introduction") == true)
                             {
                                 swr.WriteLine("            <m2-6-1-introduction>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.1 Introduction</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-1-introduction>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-written-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-written-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-2-pharmacology-written-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.2 Pharmacology Written Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-2-pharmacology-written-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-tabulated-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmacol-tabulated-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-3-pharmacology-tabulated-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("               <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.3 Pharmacology Tabulated Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-3-pharmacology-tabulated-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-written-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-written-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-4-pharmacokinetics-written-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("               <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.4 Pharmacokinetics Written Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-4-pharmacokinetics-written-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-tabulated-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "pharmkin-tabulated-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-5-pharmacokinetics-tabulated-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.5 Pharmacokinetics Tabulated Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-5-pharmacokinetics-tabulated-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-written-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-written-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-6-toxicology-written-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.6 Toxicology Written Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-6-toxicology-written-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-tabulated-summary") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum" + Path.DirectorySeparatorChar + "toxicology-tabulated-summary") == true)
                             {
                                 swr.WriteLine("            <m2-6-7-toxicology-tabulated-summary>");
-                                swr.WriteLine("                <leaf ID=\"m26-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.6.7 Toxicology Tabulated Summary</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-6-7-toxicology-tabulated-summary>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == false && m26open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "26-nonclin-sum") == false && m26open == true)
                             {
                                 swr.WriteLine("        </m2-6-nonclinical-written-and-tabulated-summaries>");
                                 m26open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum") == true && m27open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum") == true && m27open == false)
                             {
                                 swr.WriteLine("        <m2-7-clinical-summary>");
                                 m27open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum") == true
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-biopharm") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-pharm") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-efficacy") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-safety") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "literature-references") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "synopses-indiv-studies") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum") == true
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-biopharm") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-pharm") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-efficacy") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-safety") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "literature-references") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "synopses-indiv-studies") == false)
                             {
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7 Clinical Summary</title>");
                                 swr.WriteLine("                </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-biopharm") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-biopharm") == true)
                             {
                                 swr.WriteLine("            <m2-7-1-summary-of-biopharmaceutic-studies-and-associated-analytical-methods>");
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.1 Summary of Biopharmaceutic Studies and Associated Analytical Methods</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-1-summary-of-biopharmaceutic-studies-and-associated-analytical-methods>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-pharm") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-pharm") == true)
                             {
                                 swr.WriteLine("            <m2-7-2-summary-of-clinical-pharmacology-studies>");
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.2 Summary of Clinical Pharmacology Studies</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-2-summary-of-clinical-pharmacology-studies>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-efficacy") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-efficacy") == true)
                             {
-                                indication = filenameListArray[p, 0].Substring((filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "summary-clin-efficacy-") + 23), (filenameListArray[p, 0].IndexOf(".pdf") - (filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "summary-clin-efficacy-") + 23)));
+                                indication = lifecycleArray[p].Fullname.Substring((lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "summary-clin-efficacy-") + 23), (lifecycleArray[p].Fullname.IndexOf(".pdf") - (lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "summary-clin-efficacy-") + 23)));
                                 swr.WriteLine("            <m2-7-3-summary-of-clinical-efficacy indication=\"{0}\">", indication);
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.3 Summary of Clinical Efficacy - {0}</title>", indication);
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-3-summary-of-clinical-efficacy>");
                                 indication = "";
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-safety") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "summary-clin-safety") == true)
                             {
                                 swr.WriteLine("            <m2-7-4-summary-of-clinical-safety>");
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.4 Summary of Clinical Safety</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-4-summary-of-clinical-safety>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "literature-references") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "literature-references") == true)
                             {
                                 swr.WriteLine("            <m2-7-5-literature-references>");
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.5 Literature References</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-5-literature-references>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "synopses-indiv-studies") == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum" + Path.DirectorySeparatorChar + "synopses-indiv-studies") == true)
                             {
                                 swr.WriteLine("            <m2-7-6-synopses-of-individual-studies>");
-                                swr.WriteLine("                <leaf ID=\"m27-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>2.7.6 Synopses of Individual Studies</title>");
                                 swr.WriteLine("                </leaf>");
                                 swr.WriteLine("            </m2-7-6-synopses-of-individual-studies>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "27-clin-sum") == false && m27open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "27-clin-sum") == false && m27open == true)
                             {
                                 swr.WriteLine("        </m2-7-clinical-summary>");
                                 m27open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m2" + Path.DirectorySeparatorChar) == false && m2open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m2" + Path.DirectorySeparatorChar) == false && m2open == true)
                             {
                                 swr.WriteLine("    </m2-common-technical-document-summaries>");
                                 m2open = false;
-                                idcounter = 0;
                             }
 
                             //Module 3
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar) == true && m3open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar) == true && m3open == false)
                             {
                                 swr.WriteLine("    <m3-quality>");
                                 m3open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data") == true && m32open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data") == true && m32open == false)
                             {
                                 swr.WriteLine("        <m3-2-body-of-data>");
                                 m32open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == true && m32aopen == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == true && m32aopen == false)
                             {
                                 swr.WriteLine("            <m3-2-a-appendices>");
                                 m32aopen = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == true
-                                && filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == false
-                                && filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == false
-                                && filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == true
+                                && lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == false
+                                && lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == false
+                                && lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == false)
                             {
-                                swr.WriteLine("                <leaf ID=\"m32a-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>3.2.A Appendices</title>");
                                 swr.WriteLine("                </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == true && m32a1open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == true && m32a1open == false)
                             {
                                 swr.WriteLine("                <m3-2-a-1-facilities-and-equipment>");
                                 m32a1open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == true)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32a-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.A.1 Facilities and Equipment</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == false && m32a1open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a1-fac-equip") == false && m32a1open == true)
                             {
                                 swr.WriteLine("                </m3-2-a-1-facilities-and-equipment>");
                                 m32a1open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == true && m32a2open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == true && m32a2open == false)
                             {
                                 swr.WriteLine("                <m3-2-a-2-adventitious-agents-safety-evaluation>");
                                 m32a2open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == true)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32a-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.A.2 Adventitious Agents Safety Evaluation</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == false && m32a2open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a2-advent-agent") == false && m32a2open == true)
                             {
                                 swr.WriteLine("                </m3-2-a-2-adventitious-agents-safety-evaluation>");
                                 m32a2open = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == true && m32a3open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == true && m32a3open == false)
                             {
                                 swr.WriteLine("                <m3-2-a-3-excipients>");
                                 m32a3open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip"))
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32a-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.A.3 Excipients</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == false && m32a3open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app" + Path.DirectorySeparatorChar + "32a3-excip") == false && m32a3open == true)
                             {
                                 swr.WriteLine("                </m3-2-a-3-excipients>");
                                 m32a3open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == false && m32aopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32a-app") == false && m32aopen == true)
                             {
                                 swr.WriteLine("            </m3-2-a-appendices>");
                                 m32aopen = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") && m32popen == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") && m32popen == false)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32p-drug-prod");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32p-drug-prod");
                                 startposition = charindex + 15;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                product = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                product = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = product.IndexOf(Path.DirectorySeparatorChar);
                                 product = product.Substring(0, charindex);
                                 swr.WriteLine("            <m3-2-p-drug-product product-name=\"{0}\">", product);
                                 m32popen = true;
-                                idcounter = 0;
+                                
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") && m32popen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") && m32popen == true)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32p-drug-prod");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32p-drug-prod");
                                 startposition = charindex + 15;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                product1 = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                product1 = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = product1.IndexOf(Path.DirectorySeparatorChar);
                                 product1 = product1.Substring(0, charindex);
                                 if (string.Equals(product, product1) == false)
@@ -1746,163 +1738,163 @@ namespace eCTD_indexer.XML
                                     product = product1;
                                 }
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab") == false)
                             {
-                                swr.WriteLine("                <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>3.2.P Drug Product</title>");
                                 swr.WriteLine("                </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") && m32p1open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") && m32p1open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-1-description-and-composition-of-the-drug-product>");
                                 m32p1open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p1-desc-comp"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p1-desc-comp"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.1 Description and Composition of the Drug Product</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") == false && m32p1open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p1-desc-comp") == false && m32p1open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-1-description-and-composition-of-the-drug-product>");
                                 m32p1open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") && m32p2open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") && m32p2open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-2-pharmaceutical-development>");
                                 m32p2open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.2 Pharmaceutical Development</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") == false && m32p2open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p2-pharm-dev") == false && m32p2open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-2-pharmaceutical-development>");
                                 m32p2open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf") && m32p3open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf") && m32p3open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-3-manufacture>");
                                 m32p3open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "manufacturers") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "batch-formula") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "manuf-process-and-controls") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "control-critical-steps") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "process-validation") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "manufacturers") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "batch-formula") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "manuf-process-and-controls") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "control-critical-steps") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "process-validation") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.3 Manufacture</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "manufacturers"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "manufacturers"))
                             {
                                 swr.WriteLine("                    <m3-2-p-3-1-manufacturers>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.3.1 Manufacturer(s)</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-3-1-manufacturers>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "batch-formula"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "batch-formula"))
                             {
                                 swr.WriteLine("                    <m3-2-p-3-2-batch-formula>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.3.2 Batch Formula</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-3-2-batch-formula>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls"))
                             {
                                 swr.WriteLine("                    <m3-2-p-3-3-description-of-manufacturing-process-and-process-controls>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.3.3 Description of Manufacturing Process and Process Controls</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-3-3-description-of-manufacturing-process-and-process-controls>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "control-critical-steps"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "control-critical-steps"))
                             {
                                 swr.WriteLine("                    <m3-2-p-3-4-controls-of-critical-steps-and-intermediates>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.3.4 Controls of Critical Steps and Intermediates</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-3-4-controls-of-critical-steps-and-intermediates>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation") && m32p35open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation") && m32p35open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-3-5-process-validation-and-or-evaluation>");
                                 m32p35open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.3.5 Process Validation and/or Evaluation</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation") == false && m32p35open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf" + Path.DirectorySeparatorChar + "process-validation") == false && m32p35open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-3-5-process-validation-and-or-evaluation>");
                                 m32p35open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p3-manuf") == false && m32p3open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p3-manuf") == false && m32p3open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-3-manufacture>");
                                 m32p3open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && m32p4open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && m32p4open == false)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32p4-contr-excip");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32p4-contr-excip");
                                 startposition = charindex + 18;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                excipient = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                excipient = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = excipient.IndexOf(Path.DirectorySeparatorChar);
                                 if (charindex > 0)
                                 {
@@ -1912,12 +1904,12 @@ namespace eCTD_indexer.XML
                                 swr.WriteLine("                <m3-2-p-4-control-of-excipients excipient=\"{0}\">", excipient);
                                 m32p4open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && m32p4open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && m32p4open == true)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32p4-contr-excip");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32p4-contr-excip");
                                 startposition = charindex + 18;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                excipient1 = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                excipient1 = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = excipient1.IndexOf(Path.DirectorySeparatorChar);
                                 if (charindex > 0)
                                 {
@@ -1931,411 +1923,411 @@ namespace eCTD_indexer.XML
                                     excipient = excipient1;
                                 }
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar)
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "specifications") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "analytical-procedures") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "validation-analyt-procedures") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "justification-of-specifications") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "excipients-human-animal") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "novel-excipients") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar)
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "specifications") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "analytical-procedures") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "validation-analyt-procedures") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "justification-of-specifications") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "excipients-human-animal") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "novel-excipients") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                   <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.4 Excipients</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "specifications"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "specifications"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-1-specifications>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.1 Specifications</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-1-specifications>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "analytical-procedures"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "analytical-procedures"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-2-analytical-procedures>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.2 Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-2-analytical-procedures>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "validation-analyt-procedures"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "validation-analyt-procedures"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-3-validation-of-analytical-procedures>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.3 Validation of Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-3-validation-of-analytical-procedures>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "justification-of-specifications"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "justification-of-specifications"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-4-justification-of-specifications>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.4 Justification of Specifications</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-4-justification-of-specifications>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "excipients-human-animal"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "excipients-human-animal"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-5-excipients-of-human-or-animal-origin>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.5 Excipients of Human or Animal Origin</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-5-excipients-of-human-or-animal-origin>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar + "novel-excipients"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar + "novel-excipients"))
                             {
                                 swr.WriteLine("                    <m3-2-p-4-6-novel-excipients>");
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.4.6 Novel Excipients</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-p-4-6-novel-excipients>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) == false && m32p4open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p4-contr-excip" + Path.DirectorySeparatorChar) == false && m32p4open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-4-control-of-excipients>");
                                 m32p4open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") && m32p5open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") && m32p5open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-5-control-of-drug-product>");
                                 m32p5open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.5 Control of Drug Product</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
 
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") && m32p51open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") && m32p51open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-1-specifications>");
                                 m32p51open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.1 Specification(s)</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") == false && m32p51open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p51-spec") == false && m32p51open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-1-specifications>");
                                 m32p51open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") && m32p52open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") && m32p52open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-2-analytical-procedures>");
                                 m32p52open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.2 Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") == false && m32p52open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p52-analyt-proc") == false && m32p52open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-2-analytical-procedures>");
                                 m32p52open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") && m32p53open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") && m32p53open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-3-validation-of-analytical-procedures>");
                                 m32p53open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                       <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.3 Validation of Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") == false && m32p53open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p53-val-analyt-proc") == false && m32p53open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-3-validation-of-analytical-procedures>");
                                 m32p53open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") && m32p54open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") && m32p54open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-4-batch-analyses>");
                                 m32p54open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.4 Batch Analyses</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") == false && m32p54open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p54-batch-analys") == false && m32p54open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-4-batch-analyses>");
                                 m32p54open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") && m32p55open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") && m32p55open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-5-characterisation-of-impurities>");
                                 m32p55open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.5 Characterisation of Impurities</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") == false && m32p55open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p55-charac-imp") == false && m32p55open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-5-characterisation-of-impurities>");
                                 m32p55open = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") && m32p56open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") && m32p56open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-5-6-justification-of-specifications>");
                                 m32p56open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.5.6 Justification of Specifications</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") == false && m32p56open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod" + Path.DirectorySeparatorChar + "32p56-justif-spec") == false && m32p56open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-5-6-justification-of-specifications>");
                                 m32p56open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") == false && m32p5open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p5-contr-drug-prod") == false && m32p5open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-5-control-of-drug-product>");
                                 m32p5open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") && m32p6open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") && m32p6open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-6-reference-standards-or-materials>");
                                 m32p6open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p6-ref-stand"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p6-ref-stand"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.6 Reference Standards or Materials</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") == false && m32p6open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p6-ref-stand") == false && m32p6open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-6-reference-standards-or-materials>");
                                 m32p6open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") && m32p7open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") && m32p7open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-7-container-closure-system>");
                                 m32p7open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.7 Container Closure System</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") == false && m32p7open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p7-cont-closure-sys") == false && m32p7open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-7-container-closure-system>");
                                 m32p7open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab") && m32p8open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab") && m32p8open == false)
                             {
                                 swr.WriteLine("                <m3-2-p-8-stability>");
                                 m32p8open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.P.8 Stability</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") && m32p82open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") && m32p82open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-8-2-post-approval-stability-protocol-and-stability-commitment>");
                                 m32p82open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.8.2 Post-approval Stability Protocol and Stability Commitment</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false && m32p82open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false && m32p82open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-8-2-post-approval-stability-protocol-and-stability-commitment>");
                                 m32p82open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") && m32p83open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") && m32p83open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-8-3-stability-data>");
                                 m32p83open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.8.3 Stability Data</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") == false && m32p83open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-data") == false && m32p83open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-8-3-stability-data>");
                                 m32p83open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") && m32p81open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") && m32p81open == false)
                             {
                                 swr.WriteLine("                    <m3-2-p-8-1-stability-summary-and-conclusion>");
                                 m32p81open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary"))
                             {
 
-                                swr.WriteLine("                        <leaf ID=\"m32p-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.P.8.1 Stability Summary and Conclusion</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") == false && m32p81open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab" + Path.DirectorySeparatorChar + "stability-summary") == false && m32p81open == true)
                             {
                                 swr.WriteLine("                    </m3-2-p-8-1-stability-summary-and-conclusion>");
                                 m32p81open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32p8-stab") == false && m32p8open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32p8-stab") == false && m32p8open == true)
                             {
                                 swr.WriteLine("                </m3-2-p-8-stability>");
                                 m32p8open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") == false && m32popen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32p-drug-prod") == false && m32popen == true)
                             {
                                 swr.WriteLine("            </m3-2-p-drug-product>");
                                 m32popen = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info") == true && m32ropen == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info") == true && m32ropen == false)
                             {
                                 swr.WriteLine("            <m3-2-r-regional-information>");
                                 m32ropen = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info"))
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info"))
                             {
-                                swr.WriteLine("                <leaf ID=\"m32r-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                    checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                    modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                    xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                    checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                    modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                    xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                    <title>3.2.R Regional Information</title>");
                                 swr.WriteLine("                </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info") == false && m32ropen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32r-reg-info") == false && m32ropen == true)
                             {
                                 swr.WriteLine("            </m3-2-r-regional-information>");
                                 m32ropen = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") && m32sopen == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") && m32sopen == false)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub");
                                 startposition = charindex + 14;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                substance = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                substance = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = substance.IndexOf(Path.DirectorySeparatorChar);
                                 substance = substance.Substring(0, charindex);
-                                if (filenameListArray[p, 0].Contains("-manufacturer-") && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-"))
+                                if (lifecycleArray[p].Fullname.Contains("-manufacturer-") && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-"))
                                 {
-                                    apiIndex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-");
-                                    manufacturerIndex = filenameListArray[p, 0].IndexOf("-manufacturer-");
-                                    api = filenameListArray[p, 0].Substring(apiIndex + 24, (manufacturerIndex - (apiIndex + 24)));
-                                    manufacturer = filenameListArray[p, 0].Substring(manufacturerIndex + 14);
+                                    apiIndex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-");
+                                    manufacturerIndex = lifecycleArray[p].Fullname.IndexOf("-manufacturer-");
+                                    api = lifecycleArray[p].Fullname.Substring(apiIndex + 24, (manufacturerIndex - (apiIndex + 24)));
+                                    manufacturer = lifecycleArray[p].Fullname.Substring(manufacturerIndex + 14);
                                     manufacturer = manufacturer.Substring(0, manufacturer.IndexOf(Path.DirectorySeparatorChar));
                                 }
                                 else
@@ -2346,12 +2338,12 @@ namespace eCTD_indexer.XML
                                 swr.WriteLine("            <m3-2-s-drug-substance substance=\"{0}\" manufacturer=\"{1}\">", api, manufacturer);
                                 m32sopen = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") && m32sopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") && m32sopen == true)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub");
                                 startposition = charindex + 14;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                substance1 = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                substance1 = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = substance1.IndexOf(Path.DirectorySeparatorChar);
                                 substance1 = substance1.Substring(0, charindex);
                                 if (string.Equals(substance, substance1) == false)
@@ -2488,12 +2480,12 @@ namespace eCTD_indexer.XML
                                     }
                                     swr.WriteLine("            </m3-2-s-drug-substance>");
 
-                                    if (filenameListArray[p, 0].Contains("-manufacturer-") && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-"))
+                                    if (lifecycleArray[p].Fullname.Contains("-manufacturer-") && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-"))
                                     {
-                                        apiIndex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-");
-                                        manufacturerIndex = filenameListArray[p, 0].IndexOf("-manufacturer-");
-                                        api = filenameListArray[p, 0].Substring(apiIndex + 24, (manufacturerIndex - (apiIndex + 24)));
-                                        manufacturer = filenameListArray[p, 0].Substring(manufacturerIndex + 14);
+                                        apiIndex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "32s-drug-sub" + Path.DirectorySeparatorChar + "substance-");
+                                        manufacturerIndex = lifecycleArray[p].Fullname.IndexOf("-manufacturer-");
+                                        api = lifecycleArray[p].Fullname.Substring(apiIndex + 24, (manufacturerIndex - (apiIndex + 24)));
+                                        manufacturer = lifecycleArray[p].Fullname.Substring(manufacturerIndex + 14);
                                         manufacturer = manufacturer.Substring(0, manufacturer.IndexOf(Path.DirectorySeparatorChar));
                                     }
                                     else
@@ -2505,1831 +2497,1830 @@ namespace eCTD_indexer.XML
                                     substance = substance1;
                                 }
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info") && m32s1open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info") && m32s1open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-1-general-information>");
                                 m32s1open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "nomenclature") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "structure") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "general-properties") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "nomenclature") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "structure") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "general-properties") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.1 General Information</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "nomenclature"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "nomenclature"))
                             {
                                 swr.WriteLine("                    <m3-2-s-1-1-nomenclature>");
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.1.1 Nomenclature</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-s-1-1-nomenclature>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "structure"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "structure"))
                             {
                                 swr.WriteLine("                    <m3-2-s-1-2-structure>");
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.1.2 Structure</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-s-1-2-structure>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "general-properties"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info" + Path.DirectorySeparatorChar + "general-properties"))
                             {
                                 swr.WriteLine("                    <m3-2-s-1-3-general-properties>");
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.1.3 General Properties</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-s-1-3-general-properties>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s1-gen-info") == false && m32s1open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s1-gen-info") == false && m32s1open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-1-general-information>");
                                 m32s1open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf") && m32s2open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf") && m32s2open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-2-manufacture>");
                                 m32s2open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.2 Manufacture</title>");
                                 swr.WriteLine("                    </leaf>");
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") && m32s24open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") && m32s24open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-2-4-controls-of-critical-steps-and-intermediates>");
                                 m32s24open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.2.4 Controls of Critical Steps and Intermediates</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") == false && m32s24open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-critical-steps") == false && m32s24open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-2-4-controls-of-critical-steps-and-intermediates>");
                                 m32s24open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") && m32s23open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") && m32s23open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-2-3-control-of-materials>");
                                 m32s23open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.2.3 Control of Materials</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") == false && m32s23open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "control-of-materials") == false && m32s23open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-2-3-control-of-materials>");
                                 m32s23open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") && m32s21open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") && m32s21open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-2-1-manufacturer>");
                                 m32s21open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer"))
                             {
 
-                                swr.WriteLine("                         <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                             <title>3.2.S.2.1 Manufacturer(s)</title>");
                                 swr.WriteLine("                         </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") == false && m32s21open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manufacturer") == false && m32s21open == true)
                             {
                                 swr.WriteLine("                     </m3-2-s-2-1-manufacturer>");
                                 m32s21open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") && m32s22open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") && m32s22open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-2-2-description-of-manufacturing-process-and-process-controls>");
                                 m32s22open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.2.2 Description of Manufacturing Process and Process Controls</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") == false && m32s22open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-and-controls") == false && m32s22open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-2-2-description-of-manufacturing-process-and-process-controls>");
                                 m32s22open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") && m32s26open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") && m32s26open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-2-6-manufacturing-process-development>");
                                 m32s26open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.2.6 Manufacturing Process Development</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") == false && m32s26open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "manuf-process-development") == false && m32s26open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-2-6-manufacturing-process-development>");
                                 m32s26open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") && m32s25open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") && m32s25open == false)
                             {
                                 swr.WriteLine("                     <m3-2-s-2-5-process-validation-and-or-evaluation>");
                                 m32s25open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.2.5 Process Validation and/or Evaluation</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") == false && m32s25open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf" + Path.DirectorySeparatorChar + "process-validation") == false && m32s25open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-2-5-process-validation-and-or-evaluation>");
                                 m32s25open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s2-manuf") == false && m32s2open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s2-manuf") == false && m32s2open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-2-manufacture>");
                                 m32s2open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac") && m32s3open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac") && m32s3open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-3-characterisation>");
                                 m32s3open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "elucidation-of-structure") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "impurities") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "elucidation-of-structure") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "impurities") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.3 Characterisation</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "elucidation-of-structure"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "elucidation-of-structure"))
                             {
                                 swr.WriteLine("                    <m3-2-s-3-1-elucidation-of-structure-and-other-characteristics>");
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.3.1 Elucidation of Structure and Other Characteristics</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-s-3-1-elucidation-of-structure-and-other-characteristics>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "impurities"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac" + Path.DirectorySeparatorChar + "impurities"))
                             {
                                 swr.WriteLine("                    <m3-2-s-3-2-impurities>");
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.3.2 Impurities</title>");
                                 swr.WriteLine("                        </leaf>");
                                 swr.WriteLine("                    </m3-2-s-3-2-impurities>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s3-charac") == false && m32s3open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s3-charac") == false && m32s3open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-3-characterisation>");
                                 m32s3open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub") && m32s4open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub") && m32s4open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-4-control-of-drug-substance>");
                                 m32s4open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.4 Control of Drug Substance</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") && m32s41open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") && m32s41open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-4-1-specification>");
                                 m32s41open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.4.1 Specifications</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") == false && m32s41open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s41-spec") == false && m32s41open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-4-1-specification>");
                                 m32s41open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") && m32s42open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") && m32s42open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-4-2-analytical-procedures>");
                                 m32s42open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.4.2 Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") == false && m32s42open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s42-analyt-proc") == false && m32s42open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-4-2-analytical-procedures>");
                                 m32s42open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") && m32s43open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") && m32s43open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-4-3-validation-of-analytical-procedures>");
                                 m32s43open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.4.3 Validation of Analytical Procedures</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") == false && m32s43open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s43-val-analyt-proc") == false && m32s43open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-4-3-validation-of-analytical-procedures>");
                                 m32s43open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") && m32s44open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") && m32s44open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-4-4-batch-analyses>");
                                 m32s44open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.4.4 Batch Analyses</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") == false && m32s44open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s44-batch-analys") == false && m32s44open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-4-4-batch-analyses>");
                                 m32s44open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") && m32s45open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") && m32s45open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-4-5-justification-of-specification>");
                                 m32s45open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.4.5 Justification of Specification</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") == false && m32s45open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub" + Path.DirectorySeparatorChar + "32s45-justif-spec") == false && m32s45open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-4-5-justification-of-specification>");
                                 m32s45open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub") == false && m32s4open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s4-contr-drug-sub") == false && m32s4open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-4-control-of-drug-substance>");
                                 m32s4open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s5-ref-stand") && m32s5open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s5-ref-stand") && m32s5open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-5-reference-standards-or-materials>");
                                 m32s5open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s5-ref-stand"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s5-ref-stand"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.5 Reference Standards or Materials</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s5-ref-stand") == false && m32s5open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s5-ref-stand") == false && m32s5open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-5-reference-standards-or-materials>");
                                 m32s5open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys") && m32s6open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys") && m32s6open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-6-container-closure-system>");
                                 m32s6open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys"))
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.6 Container Closure System</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys") == false && m32s6open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s6-cont-closure-sys") == false && m32s6open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-6-container-closure-system>");
                                 m32s6open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab") && m32s7open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab") && m32s7open == false)
                             {
                                 swr.WriteLine("                <m3-2-s-7-stability>");
                                 m32s7open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") == false)
                             {
-                                swr.WriteLine("                    <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                        checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                        modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                        xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                    <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                        checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                        modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                        xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                        <title>3.2.S.7 Stability</title>");
                                 swr.WriteLine("                    </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") && m32s72open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") && m32s72open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-7-2-post-approval-stability-protocol-and-stability-commitment>");
                                 m32s72open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.7.2 Post-approval Stability Protocol and Stability Commitment</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false && m32s72open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "postapproval-stability") == false && m32s72open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-7-2-post-approval-stability-protocol-and-stability-commitment>");
                                 m32s72open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") && m32s73open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") && m32s73open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-7-3-stability-data>");
                                 m32s73open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.7.3 Stability Data</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") == false && m32s73open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-data") == false && m32s73open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-7-3-stability-data>");
                                 m32s73open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") && m32s71open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") && m32s71open == false)
                             {
                                 swr.WriteLine("                    <m3-2-s-7-1-stability-summary-and-conclusions>");
                                 m32s71open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary"))
                             {
-                                swr.WriteLine("                        <leaf ID=\"m3-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                            checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                            modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                            xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("                        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                            checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                            modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                            xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("                            <title>3.2.S.7.1 Stability Summary and Conclusions</title>");
                                 swr.WriteLine("                        </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") == false && m32s71open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab" + Path.DirectorySeparatorChar + "stability-summary") == false && m32s71open == true)
                             {
                                 swr.WriteLine("                    </m3-2-s-7-1-stability-summary-and-conclusions>");
                                 m32s71open = false;
                             }
 
 
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "32s7-stab") == false && m32s7open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "32s7-stab") == false && m32s7open == true)
                             {
                                 swr.WriteLine("                </m3-2-s-7-stability>");
                                 m32s7open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") == false && m32sopen == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data" + Path.DirectorySeparatorChar + "32s-drug-sub") == false && m32sopen == true)
                             {
                                 swr.WriteLine("            </m3-2-s-drug-substance>");
                                 m32sopen = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "32-body-data") == false && m32open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "32-body-data") == false && m32open == true)
                             {
                                 swr.WriteLine("        </m3-2-body-of-data>");
                                 m32open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref") && m33open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref") && m33open == false)
                             {
                                 swr.WriteLine("        <m3-3-literature-references>");
                                 m33open = true;
-                                idcounter = 1;
+                                
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref"))
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref"))
                             {
-                                swr.WriteLine("            <leaf ID=\"m33-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("                checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("                modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("                xlink:href=\"{0}\">", filenameListArray[p, 1]);
-                                swr.WriteLine("                <title>3.3 Literature Reference - {0}</title>", idcounter.ToString());
+                                swr.WriteLine("            <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("                checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("                modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("                xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
+                                swr.WriteLine("                <title>3.3 Literature Reference - {0}</title>", lifecycleArray[p].ID);
                                 swr.WriteLine("            </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref") == false && m33open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar + "33-lit-ref") == false && m33open == true)
                             {
                                 swr.WriteLine("        </m3-3-literature-references>");
                                 m33open = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains("m3" + Path.DirectorySeparatorChar) == false && m3open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m3" + Path.DirectorySeparatorChar) == false && m3open == true)
                             {
                                 swr.WriteLine("    </m3-quality>");
                                 m3open = false;
-                                idcounter = 0;
+                                
                             }
 
                             //Module 4
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar) == true && m4open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar) == true && m4open == false)
                             {
                                 swr.WriteLine(" <m4-nonclinical-study-reports>");
                                 m4open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar) == true
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar) == true
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4 Nonclinical Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") && m42open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") && m42open == false)
                             {
                                 swr.WriteLine("     <m4-2-study-reports>");
                                 m42open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2 Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") && m421open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") && m421open == false)
                             {
                                 swr.WriteLine("         <m4-2-1-pharmacology>");
                                 m421open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.1 Pharmacology</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") && m4211open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") && m4211open == false)
                             {
                                 swr.WriteLine("             <m4-2-1-1-primary-pharmacodynamics>");
                                 m4211open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.1.1 Primary Pharmacodynamics</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") == false && m4211open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4211-prim-pd") == false && m4211open == true)
                             {
                                 swr.WriteLine("             </m4-2-1-1-primary-pharmacodynamics>");
                                 m4211open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") && m4212open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") && m4212open == false)
                             {
                                 swr.WriteLine("             <m4-2-1-2-secondary-pharmacodynamics>");
                                 m4212open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.1.2 Secondary Pharmacodynamics</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") == false && m4212open == true)
+
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4212-sec-pd") == false && m4212open == true)
                             {
                                 swr.WriteLine("             </m4-2-1-2-secondary-pharmacodynamics>");
                                 m4212open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") && m4213open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") && m4213open == false)
                             {
                                 swr.WriteLine("             <m4-2-1-3-safety-pharmacology>");
                                 m4213open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.1.3 Safety Pharmacology</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") == false && m4213open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4213-safety-pharmacol") == false && m4213open == true)
                             {
                                 swr.WriteLine("             </m4-2-1-3-safety-pharmacology>");
                                 m4213open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") && m4214open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") && m4214open == false)
                             {
                                 swr.WriteLine("             <m4-2-1-4-pharmacodynamic-drug-interactions>");
                                 m4214open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.1.4 Pharmacodynamic Drug Interactions</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") == false && m4214open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol" + Path.DirectorySeparatorChar + "4214-pd-drug-interact") == false && m4214open == true)
                             {
                                 swr.WriteLine("             </m4-2-1-4-pharmacodynamic-drug-interactions>");
                                 m4214open = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") == false && m421open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "421-pharmacol") == false && m421open == true)
                             {
                                 swr.WriteLine("         </m4-2-1-pharmacology>");
                                 m421open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") && m422open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") && m422open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-pharmacokinetics>");
                                 m422open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2 Pharmacokinetics</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") && m4221open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") && m4221open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-1-analytical-methods-and-validation-reports>");
                                 m4221open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.1 Analytical Methods and Validation Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") == false && m4221open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4221-analyt-met-val") == false && m4221open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-1-analytical-methods-and-validation-reports>");
                                 m4221open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") && m4222open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") && m4222open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-2-absorption>");
                                 m4222open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.2 Absorption</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") == false && m4222open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4222-absorp") == false && m4222open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-2-absorption>");
                                 m4222open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") && m4223open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") && m4223open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-3-distribution>");
                                 m4223open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.3 Distribution</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") == false && m4223open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4223-distrib") == false && m4223open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-3-distribution>");
                                 m4223open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") && m4224open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") && m4224open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-4-metabolism>");
                                 m4224open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.4 Metabolism</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") == false && m4224open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4224-metab") == false && m4224open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-4-metabolism>");
                                 m4224open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") && m4225open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") && m4225open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-5-excretion>");
                                 m4225open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.5 Excretion</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") == false && m4225open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4225-excr") == false && m4225open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-5-excretion>");
                                 m4225open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") && m4226open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") && m4226open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-6-pharmacokinetic-drug-interactions>");
                                 m4226open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.6 Pharmacokinetic Drug Interactions</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") == false && m4226open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4226-pk-drug-interact") == false && m4226open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-6-pharmacokinetic-drug-interactions>");
                                 m4226open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") && m4227open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") && m4227open == false)
                             {
                                 swr.WriteLine("         <m4-2-2-7-other-pharmacokinetic-studies>");
                                 m4227open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.2.7 Other Pharmacokinetic Studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") == false && m4227open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk" + Path.DirectorySeparatorChar + "4227-other-pk-stud") == false && m4227open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-7-other-pharmacokinetic-studies>");
                                 m4227open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") == false && m422open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "422-pk") == false && m422open == true)
                             {
                                 swr.WriteLine("         </m4-2-2-pharmacokinetics>");
                                 m422open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") && m423open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") && m423open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-toxicology>");
                                 m423open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3 Toxicology</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") && m4231open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") && m4231open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-1-single-dose-toxicity>");
                                 m4231open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.1 Single-Dose Toxicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") == false && m4231open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4231-single-dose-tox") == false && m4231open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-1-single-dose-toxicity>");
                                 m4231open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") && m4232open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") && m4232open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-2-repeat-dose-toxicity>");
                                 m4232open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.2 Repeat-Dose Toxicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") == false && m4232open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4232-repeat-dose-tox") == false && m4232open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-2-repeat-dose-toxicity>");
                                 m4232open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") && m4233open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") && m4233open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-3-genotoxicity>");
                                 m4233open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.3 Genotoxicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") && m42331open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") && m42331open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-3-1-in-vitro>");
                                 m42331open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.3.1 In vitro</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") == false && m42331open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42331-in-vitro") == false && m42331open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-3-1-in-vitro>");
                                 m42331open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") && m42332open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") && m42332open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-3-2-in-vivo>");
                                 m42332open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.3.2 In vivo</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") == false && m42332open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox" + Path.DirectorySeparatorChar + "42332-in-vivo") == false && m42332open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-3-2-in-vivo>");
                                 m42332open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") == false && m4233open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4233-genotox") == false && m4233open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-3-genotoxicity>");
                                 m4233open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") && m4234open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") && m4234open == false)
                             {
                                 swr.WriteLine("			<m4-2-3-4-carcinogenicity>");
                                 m4234open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.4 Carcinogenicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") && m42341open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") && m42341open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-4-1-long-term-studies>");
                                 m42341open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.4.1 Long-term studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") == false && m42341open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42341-lt-stud") == false && m42341open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-4-1-long-term-studies>");
                                 m42341open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") && m42342open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") && m42342open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-4-2-short-or-medium-term-studies>");
                                 m42342open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.4.2 Short- or medium-term studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") == false && m42342open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42342-smt-stud") == false && m42342open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-4-2-short-or-medium-term-studies>");
                                 m42342open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") && m42343open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") && m42343open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-4-3-other-studies>");
                                 m42343open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.4.3 Other studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") == false && m42343open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen" + Path.DirectorySeparatorChar + "42343-other-stud") == false && m42343open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-4-3-other-studies>");
                                 m42343open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") == false && m4234open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4234-carcigen") == false && m4234open == true)
                             {
                                 swr.WriteLine("			</m4-2-3-4-carcinogenicity>");
                                 m4234open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") && m4235open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") && m4235open == false)
                             {
                                 swr.WriteLine("			<m4-2-3-5-reproductive-and-developmental-toxicity>");
                                 m4235open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.5 Reproductive and Developmental Toxicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") && m42351open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") && m42351open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-5-1-fertility-and-early-embryonic-development>");
                                 m42351open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.5.1 Fertility and early embryonic development</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") == false && m42351open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42351-fert-embryo-dev") == false && m42351open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-5-1-fertility-and-early-embryonic-development>");
                                 m42351open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") && m42352open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") && m42352open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-5-2-embryo-fetal-development>");
                                 m42352open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.5.2 Embryo-fetal development</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") == false && m42352open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42352-embryo-fetal-dev") == false && m42352open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-5-2-embryo-fetal-development>");
                                 m42352open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") && m42353open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") && m42353open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-5-3-prenatal-and-postnatal-development-including-maternal-function>");
                                 m42353open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.5.3 Prenatal and postnatal development, including maternal function</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") == false && m42353open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42353-pre-postnatal-dev") == false && m42353open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-5-3-prenatal-and-postnatal-development-including-maternal-function>");
                                 m42353open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") && m42354open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") && m42354open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-5-4-studies-in-which-the-offspring-juvenile-animals-are-dosed-and-or-further-evaluated>");
                                 m42354open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.5.4 Studies in which the offspring (juvenile animals) are dosed and/or further evaluated</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") == false && m42354open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox" + Path.DirectorySeparatorChar + "42354-juv") == false && m42354open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-5-4-studies-in-which-the-offspring-juvenile-animals-are-dosed-and-or-further-evaluated>");
                                 m42354open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") == false && m4235open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4235-repro-dev-tox") == false && m4235open == true)
                             {
                                 swr.WriteLine("			</m4-2-3-5-reproductive-and-developmental-toxicity>");
                                 m4235open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") && m4236open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") && m4236open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-6-local-tolerance>");
                                 m4236open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.6 Local Tolerance</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") == false && m4236open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4236-loc-tol") == false && m4236open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-6-local-tolerance>");
                                 m4236open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") && m4237open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") && m4237open == false)
                             {
                                 swr.WriteLine("			<m4-2-3-7-other-toxicity-studies>");
                                 m4237open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud")
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") == false
-                                && filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud")
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") == false
+                                && lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7 Other Toxicity Studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") && m42371open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") && m42371open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-1-antigenicity>");
                                 m42371open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.1 Antigenicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") == false && m42371open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42371-antigen") == false && m42371open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-1-antigenicity>");
                                 m42371open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") && m42372open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") && m42372open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-2-immunotoxicity>");
                                 m42372open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.2 Immunotoxicity</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") == false && m42372open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42372-immunotox") == false && m42372open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-2-immunotoxicity>");
                                 m42372open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") && m42373open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") && m42373open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-3-mechanistic-studies>");
                                 m42373open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.3 Mechanistic studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") == false && m42373open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42373-mechan-stud") == false && m42373open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-3-mechanistic-studies>");
                                 m42373open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") && m42374open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") && m42374open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-4-dependence>");
                                 m42374open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.4 Dependence</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") == false && m42374open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42374-dep") == false && m42374open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-4-dependence>");
                                 m42374open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") && m42375open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") && m42375open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-5-metabolites>");
                                 m42375open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.5 Metabolites</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") == false && m42375open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42375-metab") == false && m42375open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-5-metabolites>");
                                 m42375open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") && m42376open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") && m42376open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-6-impurities>");
                                 m42376open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.6 Impurities</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") == false && m42376open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42376-imp") == false && m42376open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-6-impurities>");
                                 m42376open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") && m42377open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") && m42377open == false)
                             {
                                 swr.WriteLine("         <m4-2-3-7-7-other>");
                                 m42377open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m4-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>4.2.3.7.7 Other</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") == false && m42377open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud" + Path.DirectorySeparatorChar + "42377-other") == false && m42377open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-7-7-other>");
                                 m42377open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") == false && m4237open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox" + Path.DirectorySeparatorChar + "4237-other-tox-stud") == false && m4237open == true)
                             {
                                 swr.WriteLine("			</m4-2-3-7-other-toxicity-studies>");
                                 m4237open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") == false && m423open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep" + Path.DirectorySeparatorChar + "423-tox") == false && m423open == true)
                             {
                                 swr.WriteLine("         </m4-2-3-toxicology>");
                                 m423open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") == false && m42open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "42-stud-rep") == false && m42open == true)
                             {
                                 swr.WriteLine("     </m4-2-study-reports>");
                                 m42open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") && m43open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") && m43open == false)
                             {
                                 swr.WriteLine("     <m4-3-literature-references>");
                                 m43open = true;
-                                idcounter = 1;
+                                
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref"))
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m43-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
-                                swr.WriteLine("         <title>4.3 Literature Reference - {0}</title>", filenameListArray[p, 0].Substring(filenameListArray[p, 0].LastIndexOf(Path.DirectorySeparatorChar) + 1, (filenameListArray[p, 0].Length - (filenameListArray[p, 0].LastIndexOf(Path.DirectorySeparatorChar) + 5))));
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
+                                swr.WriteLine("         <title>4.3 Literature Reference - {0}</title>", lifecycleArray[p].Fullname.Substring(lifecycleArray[p].Fullname.LastIndexOf(Path.DirectorySeparatorChar) + 1, (lifecycleArray[p].Fullname.Length - (lifecycleArray[p].Fullname.LastIndexOf(Path.DirectorySeparatorChar) + 5))));
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") == false && m43open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar + "43-lit-ref") == false && m43open == true)
                             {
                                 swr.WriteLine("     </m4-3-literature-references>");
                                 m43open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m4" + Path.DirectorySeparatorChar) == false && m4open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m4" + Path.DirectorySeparatorChar) == false && m4open == true)
                             {
                                 swr.WriteLine(" </m4-nonclinical-study-reports>");
                                 m4open = false;
                             }
 
                             //Module 5
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar) == true && m5open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar) == true && m5open == false)
                             {
                                 swr.WriteLine(" <m5-clinical-study-reports>");
                                 m5open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list") && m52open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list") && m52open == false)
                             {
                                 swr.WriteLine("     <m5-2-tabular-listing-of-all-clinical-studies>");
                                 m52open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.2 Tabular Listing of all Clinical Studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list") == false && m52open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "52-tab-list") == false && m52open == true)
                             {
                                 swr.WriteLine("     </m5-2-tabular-listing-of-all-clinical-studies>");
                                 m52open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep") && m53open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep") && m53open == false)
                             {
                                 swr.WriteLine("     <m5-3-clinical-study-reports>");
                                 m53open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "531-rep-biopharm-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "533-rep-human-pk-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "534-rep-human-pd-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "536-postmark-exp") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "537-crf-ipl") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "531-rep-biopharm-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "533-rep-human-pk-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "534-rep-human-pd-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "536-postmark-exp") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "537-crf-ipl") == false)
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3 Clinical Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud") && m531open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud") && m531open == false)
                             {
                                 swr.WriteLine("     <m5-3-1-reports-of-biopharmaceutic-studies>");
                                 m531open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5311-ba-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") == false
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5311-ba-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") == false
                                 )
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("        <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3.1 Reports of Biopharmaceutic Studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep") && m5311open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep") && m5311open == false)
                             {
                                 swr.WriteLine("     <m5-3-1-1-bioavailability-study-reports>");
                                 m5311open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3.1.1 Bioavailability (BA) Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep") == false && m5311open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5311-ba-stud-rep") == false && m5311open == true)
                             {
                                 swr.WriteLine("     </m5-3-1-1-bioavailability-study-reports>");
                                 m5311open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") && m5312open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") && m5312open == false)
                             {
                                 swr.WriteLine("     <m5-3-1-2-comparative-ba-and-bioequivalence-study-reports>");
                                 m5312open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3.1.2 Comparative BA and Bioequivalence (BE) Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") == false && m5312open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5312-compar-ba-be-stud-rep") == false && m5312open == true)
                             {
                                 swr.WriteLine("     </m5-3-1-2-comparative-ba-and-bioequivalence-study-reports>");
                                 m5312open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") && m5313open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") && m5313open == false)
                             {
                                 swr.WriteLine("     <m5-3-1-3-in-vitro-in-vivo-correlation-study-reports>");
                                 m5313open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3.1.3 In vitro - In vivo Correlation Study Reports</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") == false && m5313open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5313-in-vitro-in-vivo-corr-stud-rep") == false && m5313open == true)
                             {
                                 swr.WriteLine("     </m5-3-1-3-in-vitro-in-vivo-correlation-study-reports>");
                                 m5313open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") && m5314open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") && m5314open == false)
                             {
                                 swr.WriteLine("     <m5-3-1-4-reports-of-bioanalytical-and-analytical-methods-for-human-studies>");
                                 m5314open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met"))
                             {
-                                swr.WriteLine("         <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("             checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("             modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("             xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("         <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("             checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("             modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("             xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("             <title>5.3.1.4 Reports of Bioanalytical and Analytical Methods for Human Studies</title>");
                                 swr.WriteLine("          </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") == false && m5314open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud" + Path.DirectorySeparatorChar + "5314-bioanalyt-analyt-met") == false && m5314open == true)
                             {
                                 swr.WriteLine("     </m5-3-1-4-reports-of-bioanalytical-and-analytical-methods-for-human-studies>");
                                 m5314open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud") == false && m531open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "531-rep-biopharm-stud") == false && m531open == true)
                             {
                                 swr.WriteLine("     </m5-3-1-reports-of-biopharmaceutic-studies>");
                                 m531open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") && m532open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") && m532open == false)
                             {
                                 swr.WriteLine("     <m5-3-2-reports-of-studies-pertinent-to-pharmacokinetics-using-human-biomaterials>");
                                 m532open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") == false)
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.2 Reports of Studies Pertinent to Pharmacokinetics using Human Biomaterials</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") && m5321open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") && m5321open == false)
                             {
                                 swr.WriteLine("     <m5-3-2-1-plasma-protein-binding-study-reports>");
                                 m5321open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.2.1 Plasma Protein Binding Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") == false && m5321open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5321-plasma-prot-bind-stud-rep") == false && m5321open == true)
                             {
                                 swr.WriteLine("     </m5-3-2-1-plasma-protein-binding-study-reports>");
                                 m5321open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") && m5322open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") && m5322open == false)
                             {
                                 swr.WriteLine("     <m5-3-2-2-reports-of-hepatic-metabolism-and-drug-interaction-studies>");
                                 m5322open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.2.2 Reports of Hepatic Metabolism and Drug Interaction Studies</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") == false && m5322open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5322-rep-hep-metab-interact-stud") == false && m5322open == true)
                             {
                                 swr.WriteLine("     </m5-3-2-2-reports-of-hepatic-metabolism-and-drug-interaction-studies>");
                                 m5322open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") && m5323open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") && m5323open == false)
                             {
                                 swr.WriteLine("     <m5-3-2-3-reports-of-studies-using-other-human-biomaterials>");
                                 m5323open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.2.3 Reports of Studies Using Other Human Biomaterials</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") == false && m5323open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat" + Path.DirectorySeparatorChar + "5323-stud-other-human-biomat") == false && m5323open == true)
                             {
                                 swr.WriteLine("     </m5-3-2-3-reports-of-studies-using-other-human-biomaterials>");
                                 m5323open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false && m532open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "532-rep-stud-pk-human-biomat") == false && m532open == true)
                             {
                                 swr.WriteLine("     </m5-3-2-reports-of-studies-pertinent-to-pharmacokinetics-using-human-biomaterials>");
                                 m532open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud") && m533open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud") && m533open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-reports-of-human-pharmacokinetics-pk-studies>");
                                 m533open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") == false)
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3 Reports of Human Pharmacokinetic (PK) Studies</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") && m5331open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") && m5331open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-1-healthy-subject-pk-and-initial-tolerability-study-reports>");
                                 m5331open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3.1 Healthy Subject PK and Initial Tolerability Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") == false && m5331open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5331-healthy-subj-pk-init-tol-stud-rep") == false && m5331open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-1-healthy-subject-pk-and-initial-tolerability-study-reports>");
                                 m5331open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") && m5332open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") && m5332open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-2-patient-pk-and-initial-tolerability-study-reports>");
                                 m5332open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3.2 Patient PK and Initial Tolerability Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") == false && m5332open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5332-patient-pk-init-tol-stud-rep") == false && m5332open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-2-patient-pk-and-initial-tolerability-study-reports>");
                                 m5332open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") && m5333open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") && m5333open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-3-intrinsic-factor-pk-study-reports>");
                                 m5333open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3.3 Intrinsic Factor PK Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") == false && m5333open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5333-intrin-factor-pk-stud-rep") == false && m5333open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-3-intrinsic-factor-pk-study-reports>");
                                 m5333open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") && m5334open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") && m5334open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-4-extrinsic-factor-pk-study-reports>");
                                 m5334open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3.4 Extrinsic Factor PK Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") == false && m5334open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5334-extrin-factor-pk-stud-rep") == false && m5334open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-4-extrinsic-factor-pk-study-reports>");
                                 m5334open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") && m5335open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") && m5335open == false)
                             {
                                 swr.WriteLine("     <m5-3-3-5-population-pk-study-reports>");
                                 m5335open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.3.5 Population PK Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") == false && m5335open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud" + Path.DirectorySeparatorChar + "5335-popul-pk-stud-rep") == false && m5335open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-5-population-pk-study-reports>");
                                 m5335open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud") == false && m533open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "533-rep-human-pk-stud") == false && m533open == true)
                             {
                                 swr.WriteLine("     </m5-3-3-reports-of-human-pharmacokinetics-pk-studies>");
                                 m533open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud") && m534open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud") && m534open == false)
                             {
                                 swr.WriteLine("     <m5-3-4-reports-of-human-pharmacodynamics-pd-studies>");
                                 m534open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") == false)
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.4 Reports of Human Pharmacodynamic (PD) Studies</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") && m5341open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") && m5341open == false)
                             {
                                 swr.WriteLine("     <m5-3-4-1-healthy-subject-pd-and-pk-pd-study-reports>");
                                 m5341open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.4.1 Healthy Subject PD and PK/PD Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") == false && m5341open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5341-healthy-subj-pd-stud-rep") == false && m5341open == true)
                             {
                                 swr.WriteLine("     </m5-3-4-1-healthy-subject-pd-and-pk-pd-study-reports>");
                                 m5341open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") && m5342open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") && m5342open == false)
                             {
                                 swr.WriteLine("     <m5-3-4-2-patient-pd-and-pk-pd-study-reports>");
                                 m5342open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.4.2 Patient PD and PK/PD Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") == false && m5342open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud" + Path.DirectorySeparatorChar + "5342-patient-pd-stud-rep") == false && m5342open == true)
                             {
                                 swr.WriteLine("     </m5-3-4-2-patient-pd-and-pk-pd-study-reports>");
                                 m5342open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud") == false && m534open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "534-rep-human-pd-stud") == false && m534open == true)
                             {
                                 swr.WriteLine("     </m5-3-4-reports-of-human-pharmacodynamics-pd-studies>");
                                 m534open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") && m535open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") && m535open == false)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud");
                                 startposition = charindex + 27;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                indication = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                indication = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = indication.IndexOf(Path.DirectorySeparatorChar);
                                 indication = indication.Substring(0, charindex);
                                 swr.WriteLine("     <m5-3-5-reports-of-efficacy-and-safety-studies indication=\"{0}\">", indication);
                                 m535open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") && m535open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") && m535open == true)
                             {
-                                charindex = filenameListArray[p, 0].IndexOf(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud");
+                                charindex = lifecycleArray[p].Fullname.IndexOf(Path.DirectorySeparatorChar + "535-rep-effic-safety-stud");
                                 startposition = charindex + 27;
-                                endposition = filenameListArray[p, 0].Length - startposition;
-                                indication1 = filenameListArray[p, 0].Substring(startposition, endposition);
+                                endposition = lifecycleArray[p].Fullname.Length - startposition;
+                                indication1 = lifecycleArray[p].Fullname.Substring(startposition, endposition);
                                 charindex = indication1.IndexOf(Path.DirectorySeparatorChar);
                                 indication1 = indication1.Substring(0, charindex);
                                 if (string.Equals(indication, indication1) == false)
@@ -4360,181 +4351,181 @@ namespace eCTD_indexer.XML
                                 }
                             }
 
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud")
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") == false
-                                && filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud")
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") == false
+                                && lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") == false)
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.5 Reports of Efficacy and Safety Studies</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") && m5351open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") && m5351open == false)
                             {
                                 swr.WriteLine("     <m5-3-5-1-study-reports-of-controlled-clinical-studies-pertinent-to-the-claimed-indication>");
                                 m5351open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.5.1 Study Reports of Controlled Clinical Studies Pertinent to the Claimed Indication</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") == false && m5351open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5351-stud-rep-contr") == false && m5351open == true)
                             {
                                 swr.WriteLine("     </m5-3-5-1-study-reports-of-controlled-clinical-studies-pertinent-to-the-claimed-indication>");
                                 m5351open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") && m5352open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") && m5352open == false)
                             {
                                 swr.WriteLine("     <m5-3-5-2-study-reports-of-uncontrolled-clinical-studies>");
                                 m5352open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.5.2 Study Reports of Uncontrolled Clinical Studies</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") == false && m5352open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5352-stud-rep-uncontr") == false && m5352open == true)
                             {
                                 swr.WriteLine("     </m5-3-5-2-study-reports-of-uncontrolled-clinical-studies>");
                                 m5352open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") && m5353open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") && m5353open == false)
                             {
                                 swr.WriteLine("     <m5-3-5-3-reports-of-analyses-of-data-from-more-than-one-study>");
                                 m5353open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.5.3 Reports of Analyses of Data from More than One Study</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") == false && m5353open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5353-rep-analys-data-more-one-stud") == false && m5353open == true)
                             {
                                 swr.WriteLine("     </m5-3-5-3-reports-of-analyses-of-data-from-more-than-one-study>");
                                 m5353open = false;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") && m5354open == false)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") && m5354open == false)
                             {
                                 swr.WriteLine("     <m5-3-5-4-other-study-reports>");
                                 m5354open = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep"))
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.5.4 Other Study Reports</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") == false && m5354open == true)
+                            if (lifecycleArray[p].Fullname.Contains(Path.DirectorySeparatorChar + "5354-other-stud-rep") == false && m5354open == true)
                             {
                                 swr.WriteLine("     </m5-3-5-4-other-study-reports>");
                                 m5354open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") == false && m535open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "535-rep-effic-safety-stud") == false && m535open == true)
                             {
                                 swr.WriteLine("     </m5-3-5-reports-of-efficacy-and-safety-studies>");
                                 m535open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp") && m536open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp") && m536open == false)
                             {
                                 swr.WriteLine("     <m5-3-6-reports-of-postmarketing-experience>");
                                 m536open = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m5-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
                                 swr.WriteLine("         <title>5.3.6 Reports of Postmarketing Experience</title>");
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp") == false && m536open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "536-postmark-exp") == false && m536open == true)
                             {
                                 swr.WriteLine("     </m5-3-6-reports-of-postmarketing-experience>");
                                 m536open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl") && m537open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl") && m537open == false)
                             {
                                 swr.WriteLine("     <m5-3-7-case-report-forms-and-individual-patient-listings>");
                                 m537open = true;
-                                idcounter = 1;
+                                
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m537-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
-                                swr.WriteLine("         <title>5.3.7 Case Report Forms and Individual Patient Listings - {0}</title>", idcounter.ToString());
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
+                                swr.WriteLine("         <title>5.3.7 Case Report Forms and Individual Patient Listings - {0}</title>", lifecycleArray[p].ID);
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl") == false && m537open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep" + Path.DirectorySeparatorChar + "537-crf-ipl") == false && m537open == true)
                             {
                                 swr.WriteLine("     </m5-3-7-case-report-forms-and-individual-patient-listings>");
                                 m537open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep") == false && m53open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "53-clin-stud-rep") == false && m53open == true)
                             {
                                 swr.WriteLine("     </m5-3-clinical-study-reports>");
                                 m53open = false;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref") && m54open == false)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref") && m54open == false)
                             {
                                 swr.WriteLine("     <m5-4-literature-references>");
                                 m54open = true;
-                                idcounter = 1;
+                                
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref"))
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref"))
                             {
-                                swr.WriteLine("     <leaf ID=\"m54-{0}\" operation=\"{1}\" checksum-type=\"md5\"", idcounter, filenameListArray[p, 3]);
-                                swr.WriteLine("         checksum=\"{0}\"", filenameListArray[p, 2]);
-                                swr.WriteLine("         modified-file=\"{0}\"", filenameListArray[p, 4]);
-                                swr.WriteLine("         xlink:href=\"{0}\">", filenameListArray[p, 1]);
-                                swr.WriteLine("         <title>5.4 Literature Reference - {0}</title>", filenameListArray[p, 0].Substring(filenameListArray[p, 0].LastIndexOf(Path.DirectorySeparatorChar) + 1, (filenameListArray[p, 0].Length - (filenameListArray[p, 0].LastIndexOf(Path.DirectorySeparatorChar) + 5))));
+                                swr.WriteLine("     <leaf ID=\"{0}\" operation=\"{1}\" checksum-type=\"md5\"", lifecycleArray[p].ID, lifecycleArray[p].LifecycleAction);
+                                swr.WriteLine("         checksum=\"{0}\"", lifecycleArray[p].MD5);
+                                swr.WriteLine("         modified-file=\"{0}\"", lifecycleArray[p].ModifiedTag);
+                                swr.WriteLine("         xlink:href=\"{0}\">", lifecycleArray[p].Shortname);
+                                swr.WriteLine("         <title>5.4 Literature Reference - {0}</title>", lifecycleArray[p].Fullname.Substring(lifecycleArray[p].Fullname.LastIndexOf(Path.DirectorySeparatorChar) + 1, (lifecycleArray[p].Fullname.Length - (lifecycleArray[p].Fullname.LastIndexOf(Path.DirectorySeparatorChar) + 5))));
                                 swr.WriteLine("     </leaf>");
-                                idcounter++; indexed = true;
+                                 indexed = true;
                             }
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref") == false && m54open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar + "54-lit-ref") == false && m54open == true)
                             {
                                 swr.WriteLine("     </m5-4-literature-references>");
                                 m54open = false;
                             }
 
-                            if (filenameListArray[p, 0].Contains("m5" + Path.DirectorySeparatorChar) == false && m5open == true)
+                            if (lifecycleArray[p].Fullname.Contains("m5" + Path.DirectorySeparatorChar) == false && m5open == true)
                             {
                                 swr.WriteLine(" </m5-clinical-study-reports>");
                                 m5open = false;
                             }
-                            if (indexed == false && filenameListArray[p, 0].Contains("m1" + Path.DirectorySeparatorChar + "eu") == false && filenameListArray[p, 0].Contains("util" + Path.DirectorySeparatorChar) == false)
+                            if (indexed == false && lifecycleArray[p].Fullname.Contains("m1" + Path.DirectorySeparatorChar + "eu") == false && lifecycleArray[p].Fullname.Contains("util" + Path.DirectorySeparatorChar) == false)
                             {
-                                unIndexed[n] = filenameListArray[p, 1];
+                                unIndexed[n] = lifecycleArray[p].Shortname;
                                 n++;
                             }
                             indexed = false;

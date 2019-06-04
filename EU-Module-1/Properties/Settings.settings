@@ -11,5 +11,8 @@
     <Setting Name="LastDossier" Type="System.String" Scope="User">
       <Value Profile="(Default)">C:\</Value>
     </Setting>
+    <Setting Name="FirstIDCharacter" Type="System.String" Scope="User">
+      <Value Profile="(Default)">i</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

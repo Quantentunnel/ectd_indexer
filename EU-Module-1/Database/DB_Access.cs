@@ -153,6 +153,159 @@ namespace eCTD_indexer.Database
             }
         }
 
+        /// <summary>
+        /// Get the file id without creating a new one if it does not exist
+        /// </summary>
+        /// <param name="lifedata"></param>
+        /// <returns></returns>
+        public String GetFileID(LifecycleData lifedata)
+        {
+            return this.GetFileID(lifedata, false);
+        }
+
+        /// <summary>
+        /// Get the file id. If it does not exist, you can choose if a new ID should be generated or not.
+        /// If a new ID should be generated, the dossier ID and sequence number is needed.
+        /// </summary>
+        /// <param name="lifedata"></param>
+        /// <param name="CreateNewId"></param>
+        /// <returns></returns>
+        public String GetFileID(LifecycleData lifedata, bool CreateNewId)
+        {
+            // Check if the metadata of the file is stored in the DB
+            DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + lifedata.Path + "' AND filename ='" + lifedata.Filename + "'");
+            this.Connection.Close();
+            if (dtInterimResult.Rows.Count == 1)
+            {
+                return dtInterimResult.Rows[0][1].ToString();
+            }
+            else if (dtInterimResult.Rows.Count == 0 && !CreateNewId)
+            {
+                return "Not yet assigned";
+            }
+            else if (dtInterimResult.Rows.Count == 0 && CreateNewId)
+            {
+                // The the next ID
+                lifedata.ID= this.GetSequenceCounter(lifedata);
+
+                // We need these information to get a new ID and store it regarding the DossierID and Seq-Number in the database
+                if(lifedata.ID != "-1" && lifedata.DID != "-1" && lifedata.Seq != "-1")
+                {
+                    // Save it to the database
+                    this.setLifecycleStatus(lifedata);
+
+                    // Add counter +1
+                    this.setSequenceCounter(lifedata);
+
+                    // Return the ID
+                    return lifedata.ID;
+                }
+                else
+                {
+                    return "N/A";
+                }
+            }
+            else
+            {
+                return "N/A";
+            }
+        }
+
+        /// <summary>
+        /// Get the current count from the current sequence
+        /// </summary>
+        /// <param name="lifedata"></param>
+        /// <returns></returns>
+        public String GetSequenceCounter(LifecycleData lifedata)
+        {
+            if (lifedata != null)
+            {
+                String SQLCommand = "Select * from counters Where Seq ='" + lifedata.Seq + "'";
+                DataSet dsIntern = new DataSet("internalcountertable");
+                SQLiteDataAdapter dataadapter = new SQLiteDataAdapter(SQLCommand, this.Connection);
+                DataSet dstmp = new DataSet();
+                dataadapter.MissingSchemaAction = MissingSchemaAction.AddWithKey;
+                dataadapter.Fill(dstmp, "countertable");
+                if (dstmp.Tables[0].Rows.Count == 1)
+                {
+                    return dstmp.Tables[0].Rows[0][2].ToString();
+                }
+                else
+                {
+                    // If there is no sequence counter yet, then it has to be generated
+                    using (SQLiteCommand comm = new SQLiteCommand())
+                    {
+                        comm.Connection = this.Connection;
+                        comm.CommandText = "INSERT INTO counters (DID,Seq,Count) VALUES (@DID,  @seq, @count)";
+
+                        try
+                        {
+                            this.Connection.Open();
+
+                            comm.Parameters.AddWithValue("@DID", MainWindow.me.DossierID);
+                            comm.Parameters.AddWithValue("@seq", lifedata.Seq);
+                            comm.Parameters.AddWithValue("@count", 1);
+
+                            comm.ExecuteNonQuery();
+                            comm.Parameters.Clear();
+                        }
+                        catch (SQLiteException)
+                        {
+
+                        }
+                        finally
+                        {
+                            this.Connection.Close();
+                        }
+                        return "1";
+                    }
+                }
+            } else
+            { return "-1"; }
+        }
+
+        /// <summary>
+        /// Add counters by plus 1
+        /// </summary>
+        /// <param name="lifedata"></param>
+        public void setSequenceCounter(LifecycleData lifedata)
+        {
+            // Add ID which is stored in the database by 1
+            String IDinDB = this.GetSequenceCounter(lifedata);
+            int ID = Convert.ToInt32(IDinDB);
+            ID++;
+
+            // Store it in the Database
+            using (SQLiteCommand comm = new SQLiteCommand())
+            {
+                try
+                {
+                    this.Connection.Open();
+                    comm.Connection = this.Connection;
+
+                    // Create the SQLCommand by using a StringBuilder to get more performane rather than using a String-Object
+                    StringBuilder SQLCommand = new StringBuilder("UPDATE ");
+                    SQLCommand.Append("counters");
+                    SQLCommand.Append(" SET ");
+                    SQLCommand.Append("count");
+                    SQLCommand.Append("=\'");
+                    SQLCommand.Append(ID.ToString());
+                    SQLCommand.Append("\'");
+                    SQLCommand.Append(" WHERE DID='" + lifedata.DID + "' AND Seq ='" + lifedata.Seq + "'");
+                    comm.CommandText = SQLCommand.ToString();
+                    comm.ExecuteNonQuery();
+                }
+                catch (SQLiteException)
+                {
+
+                }
+                finally
+                {
+                    this.Connection.Close();
+                }
+            }
+        }
+
         private DataTable ExecuteSelectSQLCommand(String Select, String Table, String Where)
         {
             String SQLCommand = Select + " from " + Table + " " + Where;
@@ -196,10 +349,12 @@ namespace eCTD_indexer.Database
     {
         public LifecycleData()
         {
+            DID = "-1";
             ID = "-1";
             Path = "-1";
             Filename = "-1";
             SHA256 = "-1";
+            MD5 = "-1";
             LifecycleAction = "New";
             Seq = "-1";
             Corresponding_prev_ID = "-1";
@@ -207,7 +362,40 @@ namespace eCTD_indexer.Database
             IsCorrespondingVirtual = false;
         }
 
-        public String ID { get; set; }
+        // Internal variables
+        private String iid;
+
+        // For the database operations
+        public String DID { get; set; }
+        public String ID {
+            get {
+                if (this.iid != null)
+                {
+                    if (this.iid.Length == 1 )
+                    {
+                        return "0000" + this.iid; ;
+                    }
+                    else if (this.iid.Length == 2)
+                    {
+                        return "000" + this.iid; ;
+                    } else if (this.iid.Length == 3)
+                    {
+                        return "00" + this.iid; ;
+                    }
+                    else if (this.iid.Length == 4)
+                    {
+                        return "00" + this.iid; ;
+                    }
+                    else
+                    { return this.iid; }
+                }
+                return null;
+            }
+            set {
+                this.iid = value;
+            }
+        }
+
         public String Path { get; set; }
         public String Filename { get; set; }
         public String SHA256 { get; set; }
@@ -216,6 +404,11 @@ namespace eCTD_indexer.Database
         public String Corresponding_prev_ID { get; set; }
         public String Corresponding_next_ID { get; set; }
         public bool IsCorrespondingVirtual { get; set; }
-    
+
+        // For the xml creation operations
+        public String Fullname { get; set; }
+        public String Shortname { get; set; }
+        public String MD5 { get; set; }
+        public String ModifiedTag { get; set; }
     }
 }

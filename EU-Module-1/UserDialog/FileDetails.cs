@@ -39,6 +39,7 @@ namespace eCTD_indexer.UserDialog
             this.tbCurrentSHA256.Text = this.lifecycle.SHA256;
             this.tbCurrentSequenceNumber.Text = MainWindow.me.SeqNumber;
             this.tbCurrentStatusOld.Text = this.dba.getFileStatus(this.lifecycle.Path, this.lifecycle.Filename);
+            this.tbCurrentID.Text = lifecycle.ID;
 
             // Set Tooltip
             ToolTip t = new ToolTip();

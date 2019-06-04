@@ -709,6 +709,9 @@ namespace eCTD_indexer
                                 // Save the status (new, append, replace, delete)
                                 lifecycle.LifecycleAction = status;
 
+                                // DossierID
+                                lifecycle.DID = MainWindow.me.DossierID;
+
                                 // Save the Filename
                                 lifecycle.Filename = FileListView.SelectedItems[0].Text;
 
@@ -720,6 +723,9 @@ namespace eCTD_indexer
 
                                 // Current Sequence Number
                                 lifecycle.Seq = MainWindow.me.SeqNumber;
+
+                                // Get the file id
+                                lifecycle.ID = this.dba.GetFileID(lifecycle);
                             }
                             // if the item is found in the database.
                             else

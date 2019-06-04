@@ -55,14 +55,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="EU-Module-1.exe" size="742400">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="EU-Module-1.exe" size="738816">
       <assemblyIdentity name="EU-Module-1" version="0.6.99.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>yHrm/iAg/8VU1s7dqBLrcpGuUid9UAFyzaBIQwnny4g=</dsig:DigestValue>
+        <dsig:DigestValue>IuHNaxxyEm2gMNrVOH0itOCUXHKISqqZ0XQa0jqs+E8=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -90,13 +90,13 @@
       </hash>
     </dependentAssembly>
   </dependency>
-  <file name="EU-Module-1.exe.config" size="1168">
+  <file name="EU-Module-1.exe.config" size="1294">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>Emftor8dOn8v/jObSPL8RTUqMn634SEI70AYzkZ5sa8=</dsig:DigestValue>
+      <dsig:DigestValue>hd0ODcqXw3r2LPwoIV1xCqCzVrxJDEtISaK9tXMNChs=</dsig:DigestValue>
     </hash>
   </file>
   <file name="Resources\Application.ico" size="15086">
