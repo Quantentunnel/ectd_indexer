@@ -172,33 +172,40 @@ namespace eCTD_indexer.Database
         /// <returns></returns>
         public String GetFileID(LifecycleData lifedata, bool CreateNewId)
         {
-            // Check if the metadata of the file is stored in the DB
-            DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + lifedata.Path + "' AND filename ='" + lifedata.Filename + "'");
-            this.Connection.Close();
-            if (dtInterimResult.Rows.Count == 1)
+            if (lifedata.Path != "-1" && lifedata.Filename != "-1")
             {
-                return dtInterimResult.Rows[0][1].ToString();
-            }
-            else if (dtInterimResult.Rows.Count == 0 && !CreateNewId)
-            {
-                return "Not yet assigned";
-            }
-            else if (dtInterimResult.Rows.Count == 0 && CreateNewId)
-            {
-                // The the next ID
-                lifedata.ID= this.GetSequenceCounter(lifedata);
-
-                // We need these information to get a new ID and store it regarding the DossierID and Seq-Number in the database
-                if(lifedata.ID != "-1" && lifedata.DID != "-1" && lifedata.Seq != "-1")
+                // Check if the metadata of the file is stored in the DB
+                DataTable dtInterimResult = this.ExecuteSelectSQLCommand("Select *", "files", "Where path='" + lifedata.Path + "' AND filename ='" + lifedata.Filename + "'");
+                this.Connection.Close();
+                if (dtInterimResult.Rows.Count == 1)
                 {
-                    // Save it to the database
-                    this.setLifecycleStatus(lifedata);
+                    return dtInterimResult.Rows[0][1].ToString();
+                }
+                else if (dtInterimResult.Rows.Count == 0 && !CreateNewId)
+                {
+                    return "Not yet assigned";
+                }
+                else if (dtInterimResult.Rows.Count == 0 && CreateNewId)
+                {
+                    // The the next ID
+                    lifedata.ID = this.GetSequenceCounter(lifedata);
 
-                    // Add counter +1
-                    this.setSequenceCounter(lifedata);
+                    // We need these information to get a new ID and store it regarding the DossierID and Seq-Number in the database
+                    if (lifedata.ID != "-1" && lifedata.DID != "-1" && lifedata.Seq != "-1")
+                    {
+                        // Save it to the database
+                        this.setLifecycleStatus(lifedata);
 
-                    // Return the ID
-                    return lifedata.ID;
+                        // Add counter +1
+                        this.setSequenceCounter(lifedata);
+
+                        // Return the ID
+                        return lifedata.ID;
+                    }
+                    else
+                    {
+                        return "N/A";
+                    }
                 }
                 else
                 {
@@ -207,8 +214,17 @@ namespace eCTD_indexer.Database
             }
             else
             {
+                this.ThrowException();
                 return "N/A";
             }
+        }
+
+        /// <summary>
+        /// To throw exception in return-methods without getting warnings.
+        /// </summary>
+        private void ThrowException ()
+        {
+            throw new Exception();
         }
 
         /// <summary>

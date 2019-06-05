@@ -81,8 +81,7 @@ namespace eCTD_indexer.XML
             //pass root directory to dirLister
             dirListArrayM1 = this.eCTDirs.dirLister(envelope.m1euPath, 0, dirListArrayM1);
 
-            //create a filename array for sorting - workaround for sorting multidimensional array filenameListArray
-            //filenameListArray holds filenames, relative path to files, md5s, operation attributes and modified file id information
+            // Create a filename array for sorting - workaround for sorting multidimensional array filenameListArray
             string[] filenameSortArray;
             filenameSortArray = new string[m1FileNumber];
 
@@ -98,6 +97,17 @@ namespace eCTD_indexer.XML
             }
             Array.Sort(filenameSortArray);
 
+            // Create a new multidimenional array and add to every fullname entry his directory name and Filename.
+            String [,] Files = new string[filenameSortArray.Length, 3];
+            counterY = 0;
+            for (int mas = 0;mas < filenameSortArray.Length; mas++)
+            {
+                Files[counterY, 0] = filenameSortArray[mas];
+                Files[counterY, 1] = new FileInfo(filenameSortArray[mas]).DirectoryName;
+                Files[counterY, 2] = new FileInfo(filenameSortArray[mas]).Name;
+                counterY++;
+            }
+
             // Lifecycle Array
             Database.LifecycleData[] lifecycleArray = new Database.LifecycleData[m1FileNumber];
 
@@ -105,7 +115,7 @@ namespace eCTD_indexer.XML
 
             for (int p = 0; p < m1FileNumber; p++)
             {
-                FileInfo f = new FileInfo(filenameSortArray[p]);
+                FileInfo f = new FileInfo(Files[p,0]);
                 string name = f.FullName;
                 int index = name.IndexOf("m1" + Path.DirectorySeparatorChar + "eu" + Path.DirectorySeparatorChar);
                 string shortname = name.Substring(index + 6);
@@ -145,7 +155,9 @@ namespace eCTD_indexer.XML
                 lifecycle.ModifiedTag = modifiedFileID;
                 lifecycle.Seq = MainWindow.me.SeqNumber;
                 lifecycle.DID = MainWindow.me.DossierID;
-// TODO: Missing Path and File. So the information is not stored in the DB yet.
+                lifecycle.Filename = Files[p, 2];
+                lifecycle.Path = Files[p, 1];
+                lifecycle.SHA256 = XML.SHA256.GetChecksum(lifecycle.Path + @"\" + lifecycle.Filename);
                 lifecycle.ID = Properties.Settings.Default.FirstIDCharacter + dba.GetFileID(lifecycle, true);
 
                 // Add the information to the array
@@ -1038,6 +1050,17 @@ namespace eCTD_indexer.XML
             }
             Array.Sort(filenameSortArray);
 
+            // Create a new multidimenional array and add to every fullname entry his directory name and Filename.
+            String[,] Files = new string[filenameSortArray.Length, 3];
+            counterY = 0;
+            for (int mas = 0; mas < filenameSortArray.Length; mas++)
+            {
+                Files[counterY, 0] = filenameSortArray[mas];
+                Files[counterY, 1] = new FileInfo(filenameSortArray[mas]).DirectoryName;
+                Files[counterY, 2] = new FileInfo(filenameSortArray[mas]).Name;
+                counterY++;
+            }
+
             // Lifecycle Array
             Database.LifecycleData[] lifecycleArray = new Database.LifecycleData[totalFileNumber];
 
@@ -1045,7 +1068,7 @@ namespace eCTD_indexer.XML
 
             for (int p = 0; p < totalFileNumber; p++)
             {
-                FileInfo f = new FileInfo(filenameSortArray[p]);
+                FileInfo f = new FileInfo(Files[p,0]);
                 string name = f.FullName;
                 int index = name.IndexOf(sequence);
                 string shortname = name.Substring(index + 5);
@@ -1084,6 +1107,9 @@ namespace eCTD_indexer.XML
                 lifecycle.ModifiedTag = modifiedFileID;
                 lifecycle.Seq = MainWindow.me.SeqNumber;
                 lifecycle.DID = MainWindow.me.DossierID;
+                lifecycle.Filename = Files[p, 2];
+                lifecycle.Path = Files[p, 1];
+                lifecycle.SHA256 = XML.SHA256.GetChecksum(lifecycle.Path + @"\" + lifecycle.Filename);
                 lifecycle.ID = Properties.Settings.Default.FirstIDCharacter + dba.GetFileID(lifecycle, true);
 
                 // Add the information to the array
