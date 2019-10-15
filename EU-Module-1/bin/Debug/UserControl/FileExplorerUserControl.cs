@@ -210,7 +210,10 @@ namespace eCTD_indexer
         {
             this.FolderView_InitializeShowFolder(e.Node);
             this.selectedtreenode = e.Node;
-            this.set1stLevel(e.Node.FullPath);
+            try
+            {
+                this.set1stLevel(e.Node.FullPath);
+            } catch (System.InvalidOperationException) { }
         }
 
         /// <summary>

@@ -50,19 +50,19 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>ob8+omjuzfegBV+h9ib48vgB7WZUKJ+mXZSIWOZl7XE=</dsig:DigestValue>
+        <dsig:DigestValue>S7qwhszAj/NKppd/9ClJRWP7x0JE2wAGl0fC82M+V7I=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="EU-Module-1.exe" size="739328">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="EU-Module-1.exe" size="740864">
       <assemblyIdentity name="EU-Module-1" version="0.6.99.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>bVDzY0lUr3MmtBs3v1n8Ba0vRXhjhAG4cppLo8LfTXM=</dsig:DigestValue>
+        <dsig:DigestValue>4GYrScXFSvQHQbQl3fg5an47210VzlwnDzpYe3ls56c=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

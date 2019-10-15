@@ -115,7 +115,7 @@ namespace eCTD_indexer.XML
 
             for (int p = 0; p < m1FileNumber; p++)
             {
-                FileInfo f = new FileInfo(Files[p,0]);
+                FileInfo f = new FileInfo(Files[p, 0]);
                 string name = f.FullName;
                 int index = name.IndexOf("m1" + Path.DirectorySeparatorChar + "eu" + Path.DirectorySeparatorChar);
                 string shortname = name.Substring(index + 6);
@@ -131,7 +131,7 @@ namespace eCTD_indexer.XML
                 if (dba != null)
                 {
                     operation = dba.getFileStatus(f.DirectoryName, f.Name);
-                   
+
                     if (operation == "Not yet defined") { operation = "new"; }
 
                     if (operation.CompareTo("new") != 0)
@@ -143,10 +143,11 @@ namespace eCTD_indexer.XML
                     {
                         modifiedFileID = "";
                     }
-                } 
+                }
                 #endregion
 
                 // Information to generate the xml file
+
                 Database.LifecycleData lifecycle = new Database.LifecycleData();
                 lifecycle.Fullname = name;
                 lifecycle.Shortname = shortname;

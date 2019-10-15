@@ -605,38 +605,49 @@ namespace eCTD_indexer
                 cd.ShowDialog();
 
                 if (cd.DialogResult == System.Windows.Forms.DialogResult.OK)
-                {
-                    // First of all; Clear
-                    this.fileExplorerUserControl.Clear();
-                    this.ClearAllControls();
-
-                    // Show the files of the root folder
-                    this.fileExplorerUserControl.PopulateTreeView(fb.SelectedPath + "\\" + cd.SelectedSequence);
-
-                    // 0000-workingdocuments
-                    this.fileExplorerUserControl.PopulateTreeView(fb.SelectedPath + "\\"+ cd.SelectedSequence +"-workingdocuments");
-
-                    // Store the Sequence Directory
-                    this.SeqDir = fb.SelectedPath + "\\" + cd.SelectedSequence;
-
-                    // Open Database
-                    this.fileExplorerUserControl.LoadDB(fb.SelectedPath);
-
-                    // Load the xml file / xml data
-                    if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))
+                {try
                     {
-                        this.loadXMLData();
+                        // First of all; Clear
+                        this.fileExplorerUserControl.Clear();
+                        this.ClearAllControls();
 
-                        // Remeber the last dossier
-                        Properties.Settings.Default.LastDossier = this.SeqDir;
-                        Properties.Settings.Default.Save();
+                        // Show the files of the root folder
+                        this.fileExplorerUserControl.PopulateTreeView(fb.SelectedPath + "\\" + cd.SelectedSequence);
+
+                        // 0000-workingdocuments
+                        this.fileExplorerUserControl.PopulateTreeView(fb.SelectedPath + "\\" + cd.SelectedSequence + "-workingdocuments");
+
+                        // Store the Sequence Directory
+                        this.SeqDir = fb.SelectedPath + "\\" + cd.SelectedSequence;
+
+                        // Open Database
+                        this.fileExplorerUserControl.LoadDB(fb.SelectedPath);
+
+                        // Load the xml file / xml data
+                        if (File.Exists(this.SeqDir + @"\m1\eu\eu-regional.xml"))
+                        {
+                            this.loadXMLData();
+
+                            // Remeber the last dossier
+                            Properties.Settings.Default.LastDossier = this.SeqDir;
+                            Properties.Settings.Default.Save();
+                        }
+
+                        // Save the Path to the Seq in the fileExplorer
+                        this.fileExplorerUserControl.SeqPath = fb.SelectedPath + "\\" + cd.SelectedSequence;
+
+                        // Set the Dossier as Opened
+                        this.DossierOpened = true;
                     }
+                    catch (System.Xml.XmlException)
+                    {
+                        // Show the user a Message Box containing a description of the problem.
+                        MessageBox.Show("The xml files which are needed to open the dossier are invalid.\nPlease delete the exising files or restore valid xml files", "Invalid XML Files", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-                    // Save the Path to the Seq in the fileExplorer
-                    this.fileExplorerUserControl.SeqPath = fb.SelectedPath + "\\" + cd.SelectedSequence;
-
-                    // Set the Dossier as Opened
-                    this.DossierOpened = true;
+                        // Clear everything which has been done till now
+                        this.fileExplorerUserControl.Clear();
+                        this.ClearAllControls();
+                    }
                 }
 
                 cd.Dispose();
@@ -924,6 +935,10 @@ namespace eCTD_indexer
         /// <param name="e"></param>
         private void tsbCreateXMLFiles_Click(object sender, EventArgs e)
         {
+            // First of all, refresh the information about the dossier.
+            // Maybe the user updated files in the Windows Explorer but eCTDindexer does not know.
+            tsbRefreshFolderView_Click(null, null);
+
             // Check if a dosier is really open
             if (this.DossierOpened)
             {
@@ -936,98 +951,117 @@ namespace eCTD_indexer
                         {
                             if (this.IsAgencyChecked())
                             {
-                                #region EURegional.xml
-                                GeneralArchitectureModule1.EU_envelope envelope = new GeneralArchitectureModule1.EU_envelope();
-                                //string variables for EU envelope
-                                envelope.UUID = this.tbIdentifier.Text;
-                                envelope.trackingNumber = textBoxTrackNo.Text;
-                                envelope.INN = textBoxINN.Text;
-                                envelope.submDescr = textBoxSubmDescr.Text;
-                                envelope.relSeq = textBoxRelSeq.Text;
-                                envelope.procType = comboBoxProcType.Text;
-                                envelope.submType = comboBoxSubmType.Text;
-                                envelope.m1euPath = SeqDir + Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar + "eu";
-                                envelope.country = "Common";
-                                envelope.language = "";
-                                envelope.m131identifier = "combined";
-                                envelope.m1euPathIndex = envelope.m1euPath.IndexOf(Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar);
-                                envelope.sequence = envelope.m1euPath.Substring(envelope.m1euPathIndex - 4, 4);
-                                envelope.sequencePath = SeqDir;
-                                envelope.applicationMode = comboBoxMode.Text;
-                                envelope.appHighLevelNo = textBoxNumber.Text;
-                                envelope.comboBoxMode = comboBoxMode.Enabled;
-                                envelope.comboBoxSubmUnit = comboBoxSubmUnit.Text;
-                                envelope.NumberEnabled = textBoxNumber.Enabled;
-
-                                //generate new uuid if no uuid has been copied from a previous sequence (using the copy envelope button)
-                                if (envelope.UUID == "")
+                                if (this.IsDatabaseAvailable())
                                 {
-                                    envelope.UUID = Guid.NewGuid().ToString();
-                                    this.tbIdentifier.Text = envelope.UUID;
-                                }
+                                    #region EURegional.xml
+                                    GeneralArchitectureModule1.EU_envelope envelope = new GeneralArchitectureModule1.EU_envelope();
+                                    //string variables for EU envelope
+                                    envelope.UUID = this.tbIdentifier.Text;
+                                    envelope.trackingNumber = textBoxTrackNo.Text;
+                                    envelope.INN = textBoxINN.Text;
+                                    envelope.submDescr = textBoxSubmDescr.Text;
+                                    envelope.relSeq = textBoxRelSeq.Text;
+                                    envelope.procType = comboBoxProcType.Text;
+                                    envelope.submType = comboBoxSubmType.Text;
+                                    envelope.m1euPath = SeqDir + Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar + "eu";
+                                    envelope.country = "Common";
+                                    envelope.language = "";
+                                    envelope.m131identifier = "combined";
+                                    envelope.m1euPathIndex = envelope.m1euPath.IndexOf(Path.DirectorySeparatorChar + "m1" + Path.DirectorySeparatorChar);
+                                    envelope.sequence = envelope.m1euPath.Substring(envelope.m1euPathIndex - 4, 4);
+                                    envelope.sequencePath = SeqDir;
+                                    envelope.applicationMode = comboBoxMode.Text;
+                                    envelope.appHighLevelNo = textBoxNumber.Text;
+                                    envelope.comboBoxMode = comboBoxMode.Enabled;
+                                    envelope.comboBoxSubmUnit = comboBoxSubmUnit.Text;
+                                    envelope.NumberEnabled = textBoxNumber.Enabled;
 
-                                // collect the name of the countries, agencies, applicants and invented names.
-                                foreach (Control control in this.splitContainer1.Panel2.Controls)
-                                {
-                                    if (control is CheckBox)
+                                    //generate new uuid if no uuid has been copied from a previous sequence (using the copy envelope button)
+                                    if (envelope.UUID == "")
                                     {
-                                        if (((CheckBox)control).Checked == true)
-                                        {
-                                            if (((CheckBox)control).Tag.ToString() == "EMA")
-                                            {
-                                                envelope.envelopeCountry.Add("EMA");
-                                            }
-                                            if (((CheckBox)control).Tag.ToString() == "EDQM")
-                                            {
-                                                envelope.envelopeCountry.Add("EDQM");
-                                            }
-                                            else
-                                            {
-                                                envelope.envelopeCountry.Add((((CheckBox)control).Tag.ToString().Substring(0, 2)));
-                                            }
-                                            if (envelope.agency == null)
-                                            {
-                                                envelope.agency = new List<string>();
-                                            }
-                                            envelope.agency.Add((((CheckBox)control).Text.ToString()));
+                                        envelope.UUID = Guid.NewGuid().ToString();
+                                        this.tbIdentifier.Text = envelope.UUID;
+                                    }
 
-                                            foreach (Control control2 in this.splitContainer1.Panel2.Controls)
+                                    // collect the name of the countries, agencies, applicants and invented names.
+                                    foreach (Control control in this.splitContainer1.Panel2.Controls)
+                                    {
+                                        if (control is CheckBox)
+                                        {
+                                            if (((CheckBox)control).Checked == true)
                                             {
-                                                if ((control2 is TextBox) && ((((TextBox)control2).Tag) == (((CheckBox)control).Tag)))
+                                                if (((CheckBox)control).Tag.ToString() == "EMA")
                                                 {
-                                                    if ((((TextBox)control2).Name) == ("textBox" + (((TextBox)control2).Tag) + "App"))
+                                                    envelope.envelopeCountry.Add("EMA");
+                                                }
+                                                if (((CheckBox)control).Tag.ToString() == "EDQM")
+                                                {
+                                                    envelope.envelopeCountry.Add("EDQM");
+                                                }
+                                                else
+                                                {
+                                                    envelope.envelopeCountry.Add((((CheckBox)control).Tag.ToString().Substring(0, 2)));
+                                                }
+                                                if (envelope.agency == null)
+                                                {
+                                                    envelope.agency = new List<string>();
+                                                }
+                                                envelope.agency.Add((((CheckBox)control).Text.ToString()));
+
+                                                foreach (Control control2 in this.splitContainer1.Panel2.Controls)
+                                                {
+                                                    if ((control2 is TextBox) && ((((TextBox)control2).Tag) == (((CheckBox)control).Tag)))
                                                     {
-                                                        if (envelope.applicant == null) { envelope.applicant = new List<String>(); }
-                                                        envelope.applicant.Add(((TextBox)control2).Text);
-                                                    }
-                                                    else
-                                                    {
-                                                        if (envelope.inventedName == null) { envelope.inventedName = new List<String>(); }
-                                                        envelope.inventedName.Add(((TextBox)control2).Text);
+                                                        if ((((TextBox)control2).Name) == ("textBox" + (((TextBox)control2).Tag) + "App"))
+                                                        {
+                                                            if (envelope.applicant == null) { envelope.applicant = new List<String>(); }
+                                                            envelope.applicant.Add(((TextBox)control2).Text);
+                                                        }
+                                                        else
+                                                        {
+                                                            if (envelope.inventedName == null) { envelope.inventedName = new List<String>(); }
+                                                            envelope.inventedName.Add(((TextBox)control2).Text);
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                }
 
-                                // Try to create the xml files when the eu-path exists. Otherwise abort this method to prevent
-                                // a inconsistent status of the dossier.
-                                if (Directory.Exists(envelope.m1euPath))
-                                {
-                                    // Create the EURegional.xml file
-                                    this.XMLCreate.EURegional(envelope, this.dirs, this.files);
-                                #endregion
-
-                                    #region index.xml
-                                    if (SeqDir.CompareTo("") != 0)
+                                    // Try to create the xml files when the eu-path exists. Otherwise abort this method to prevent
+                                    // a inconsistent status of the dossier.
+                                    if (Directory.Exists(envelope.m1euPath))
                                     {
-                                        this.XMLCreate.IndexXML(SeqDir, this.dirs, this.files);
+                                        // Create the EURegional.xml file
+                                        this.XMLCreate.EURegional(envelope, this.dirs, this.files);
+                                        #endregion
+
+                                        #region index.xml
+                                        if (SeqDir.CompareTo("") != 0)
+                                        {
+                                            this.XMLCreate.IndexXML(SeqDir, this.dirs, this.files);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        MessageBox.Show("The directory " + envelope.m1euPath + " does not exist.\n\nXML creation aborted.", "Missing directory", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                     }
                                 }
                                 else
                                 {
-                                    MessageBox.Show("The directory " + envelope.m1euPath + " does not exist.\n\nXML creation aborted.", "Missing directory", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    if(MessageBox.Show("No database available.\n\nCreate new database sequence-wide dossier database?", "Missing Database", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                                    {
+                                        addReplaceMetaDatabaseToolStripMenuItem_Click(null, null);
+
+                                        if(MessageBox.Show("Retry to create the XML files?","Retry",MessageBoxButtons.YesNo,MessageBoxIcon.Question) == DialogResult.Yes)
+                                        {
+                                            // Cave: Recursive !!
+                                            this.tsbCreateXMLFiles_Click(null, null);
+                                        }
+                                    } else
+                                    {
+                                        MessageBox.Show("XML files were not created because there was no database to determine the meta-data.", "Missing database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    }
                                 }
                             }
                             else
@@ -1051,6 +1085,27 @@ namespace eCTD_indexer
                     MessageBox.Show("Please select the mode!", "Missing mode statement..", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                 }
             }
+        }
+
+        /// <summary>
+        /// Check if a database is available or not.
+        /// </summary>
+        /// <returns></returns>
+        private bool IsDatabaseAvailable()
+        {
+            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
+
+            if (Directory.Exists(root + "workingdocuments"))
+            {
+                if (Directory.Exists(root + "workingdocuments\\ectdindexer-files"))
+                {
+                    if (File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -1520,39 +1575,42 @@ namespace eCTD_indexer
 
         private void addReplaceMetaDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
-
-            if (Directory.Exists(root))
+            if (this.SeqDir != null)
             {
-                // Create the workingdocuments-Directory if it does not exist
-                if(!Directory.Exists(root + "workingdocuments"))
-                {
-                    Directory.CreateDirectory(root + "workingdocuments");
-                }
+                String root = this.SeqDir.Substring(0, this.SeqDir.Length - 4) + "\\";
 
-                // Create the ectdindex-Directory in the workingdirectory if it does not exist
-                if (!Directory.Exists(root + "workingdocuments" + "\\ectdindexer-files"))
+                if (Directory.Exists(root))
                 {
-                    Directory.CreateDirectory(root + "workingdocuments" + "\\ectdindexer-files");
-                }
-
-                // Create a fresh new metadatabase if it does not exist
-                if(!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
-                {
-                    File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db",false);
-                }
-                else
-                {
-                    if(DialogResult.Yes == MessageBox.Show("There is an existing metadatabase.\nectdindexer can replace this one with a new database. All data in the existing metadatabase will be lost. \n\n\nReset metadatabase?","Reset metadatabase?",MessageBoxButtons.YesNo,MessageBoxIcon.Question))
+                    // Create the workingdocuments-Directory if it does not exist
+                    if (!Directory.Exists(root + "workingdocuments"))
                     {
-                        File.Delete(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db");
-                        File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db",true);
+                        Directory.CreateDirectory(root + "workingdocuments");
                     }
-                }
 
-                // Refresh the view
-                //this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
-                tsbRefreshFolderView_Click(null, null);
+                    // Create the ectdindex-Directory in the workingdirectory if it does not exist
+                    if (!Directory.Exists(root + "workingdocuments" + "\\ectdindexer-files"))
+                    {
+                        Directory.CreateDirectory(root + "workingdocuments" + "\\ectdindexer-files");
+                    }
+
+                    // Create a fresh new metadatabase if it does not exist
+                    if (!File.Exists(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db"))
+                    {
+                        File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db", false);
+                    }
+                    else
+                    {
+                        if (DialogResult.Yes == MessageBox.Show("There is an existing metadatabase.\nectdindexer can replace this one with a new database. All data in the existing metadatabase will be lost. \n\n\nReset metadatabase?", "Reset metadatabase?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
+                        {
+                            File.Delete(root + "workingdocuments" + "\\ectdindexer-files\\metadata.db");
+                            File.Copy("Resources/metadata.db", root + "workingdocuments" + "\\ectdindexer-files\\metadata.db", true);
+                        }
+                    }
+
+                    // Refresh the view
+                    //this.fileExplorerUserControl.PopulateTreeView(this.SeqDir + "-workingdocuments");
+                    tsbRefreshFolderView_Click(null, null);
+                }
             }
         }
     }
